@@ -9,10 +9,10 @@ from numpy import random
 import pandas as pd
 
 import gym
-import gym_anytrading
-from gym_anytrading.envs import TradingEnv, ForexEnv, StocksEnv, Actions, Positions
-from gym_anytrading.datasets import FOREX_EURUSD_1H_ASK, STOCKS_GOOGL
-import matplotlib.pyplot as plt
+# import gym_anytrading
+# from gym_anytrading.envs import TradingEnv, ForexEnv, StocksEnv, Actions, Positions
+# from gym_anytrading.datasets import FOREX_EURUSD_1H_ASK, STOCKS_GOOGL
+# import matplotlib.pyplot as plt
 import numpy as np
 
 from tensorflow.keras.models import Sequential
@@ -164,7 +164,7 @@ class TradingEnv(gym.Env):
 if __name__ == "__main__":
     data = pd.read_csv("aapl.us.txt")
     env = TradingEnv(data)
-    
+
     np.random.seed(123)
     env.seed(123)
 
@@ -177,6 +177,7 @@ if __name__ == "__main__":
     model.add(Dense(units=8, activation='relu'))
     model.add(Dense(nb_actions))
     model.add(Activation('softmax'))
+    model.add(Flatten())
 
     # Option 1 : Simple model
     #model = Sequential()
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     policy = BoltzmannQPolicy()
     sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
     sarsa.compile("adam", metrics=['mse'])
-    
+
     # Okay, now it's time to learn something! We visualize the training here for show, but this
     # slows down training quite a lot. You can always safely abort the training prematurely using
     # Ctrl + C.
@@ -232,4 +233,3 @@ if __name__ == "__main__":
 
     # Finally, evaluate our algorithm for 5 episodes.
     #cem.test(env, nb_episodes=5, visualize=True)
-            
