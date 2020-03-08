@@ -64,6 +64,7 @@ class Simulation:
             self.funds -= TRANSACTION_SIZE*self.get_price()
             self.held_shares += TRANSACTION_SIZE
         fundsAfter = self.funds
+        # return fundsAfter - fundsBefore
         # print("perdif b{} a{} {}".format(fundsBefore, fundsAfter, (abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))))
         return (fundsAfter - fundsBefore)/abs(fundsAfter - fundsBefore if fundsAfter - fundsBefore != 0 else 1)*(abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))
         
@@ -80,7 +81,7 @@ class Simulation:
             self.volume_traded += TRANSACTION_SIZE
         fundsAfter = self.funds
 
-
+        return fundsAfter - fundsBefore
         return (fundsAfter - fundsBefore)/abs(fundsAfter - fundsBefore if fundsAfter - fundsBefore != 0 else 1)*(abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))
 
     def sell_all(self):
@@ -92,7 +93,7 @@ class Simulation:
         return fundsAfter - fundsBefore
 
     def get_prediction_price(self):
-        accuracy = 0.6
+        accuracy = 0.81
         past_price = self.get_price()
         try:
             future_price = self.stocks_open[self.index+1]
@@ -116,11 +117,14 @@ class Simulation:
         return (self.get_price(), self.get_prediction_price(), self.funds, self.held_shares)
         
     def reset(self):
+        self.past_volumes_traded.append({"volume_traded": self.volume_traded, "total_equity": self.get_total_equity()})
         self.index = 0
         self.funds = STARTING_FUNDS
         self.held_shares = 0
-        self.past_volumes_traded.append(self.volume_traded)
         self.volume_traded = 0
+
+    def get_total_equity(self):
+        return self.funds + self.held_shares*self.get_price()
 
 
 #OpenAI Gym for Trading Simulation/Trading Agent
@@ -242,12 +246,12 @@ if __name__ == "__main__":
     # Okay, now it's time to learn something! We visualize the training here for show, but this
     # slows down training quite a lot. You can always safely abort the training prematurely using
     # Ctrl + C.
-    sarsa.fit(env, nb_steps=15000, visualize=False, verbose=2)
+    sarsa.fit(env, nb_steps=5000, visualize=False, verbose=2)
     # After training is done, we save the final weights.
     sarsa.save_weights('sarsa_{}_weights.h5f'.format("appl"), overwrite=True)
     env.sim.past_volumes_traded = []
     # Finally, evaluate our algorithm for 5 episodes.
-    h = sarsa.test(env, nb_episodes=50, nb_max_start_steps=5)
+    h = sarsa.test(env, nb_episodes=5, nb_max_start_steps=500)
     print(h.history['episode_reward'])
     # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
     # even the metrics!
