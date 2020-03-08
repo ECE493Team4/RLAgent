@@ -29,11 +29,15 @@ from rl.memory import SequentialMemory, EpisodeParameterMemory
 
 
 STARTING_FUNDS = 5000
-TRANSACTION_SIZE = 10
+TRANSACTION_SIZE = 1
 
 class AgentActions(Enum):
     Buy = 0
     Sell = 1
+
+def decision(probability) -> bool:
+    return random.random() < probability
+
 
 #Holds stock data and maintains
 #current time(step) in the training.
@@ -60,16 +64,24 @@ class Simulation:
             self.funds -= TRANSACTION_SIZE*self.get_price()
             self.held_shares += TRANSACTION_SIZE
         fundsAfter = self.funds
-        return fundsAfter - fundsBefore
+        # print("perdif b{} a{} {}".format(fundsBefore, fundsAfter, (abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))))
+        return (fundsAfter - fundsBefore)/abs(fundsAfter - fundsBefore if fundsAfter - fundsBefore != 0 else 1)*(abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))
         
     def sell_shares(self):
         fundsBefore = self.funds
+
+        # if self.held_shares == 0:
+        #     punishment = -1
+        # else:
+        #     punishment = 0
         if(self.held_shares >= TRANSACTION_SIZE):
             self.funds += TRANSACTION_SIZE*self.get_price()
             self.held_shares -= TRANSACTION_SIZE
             self.volume_traded += TRANSACTION_SIZE
         fundsAfter = self.funds
-        return fundsAfter - fundsBefore
+
+
+        return (fundsAfter - fundsBefore)/abs(fundsAfter - fundsBefore if fundsAfter - fundsBefore != 0 else 1)*(abs(fundsAfter - fundsBefore)/((fundsAfter + fundsBefore)/2))
 
     def sell_all(self):
         fundsBefore = self.funds
@@ -79,12 +91,29 @@ class Simulation:
         self.held_shares = 0
         return fundsAfter - fundsBefore
 
+    def get_prediction_price(self):
+        accuracy = 0.6
+        past_price = self.get_price()
+        try:
+            future_price = self.stocks_open[self.index+1]
+        except:
+            future_price = self.get_price()
+
+        per_dif = (abs(future_price - past_price)/((future_price + past_price)/2))
+        norm_sign = (future_price - past_price)/abs(future_price - past_price if future_price - past_price != 0 else 1)
+        if decision(accuracy):
+            predicted_price = past_price + norm_sign * past_price * per_dif
+        else:
+            predicted_price = past_price - norm_sign * past_price * per_dif
+
+        return predicted_price
+
     def get_price(self):
         return self.stocks_open[self.index]
         
     #TODO: Return features/state of current sim for RL Agent
     def get_state(self):
-        return (self.get_price(),self.funds, self.held_shares)
+        return (self.get_price(), self.get_prediction_price(), self.funds, self.held_shares)
         
     def reset(self):
         self.index = 0
@@ -109,10 +138,12 @@ class TradingEnv(gym.Env):
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
+            np.finfo(np.float32).max,
         ])
         
         obs_domain_lower = np.array([
             np.finfo(np.float32).max,
+            0,
             0,
             0,
         ])
@@ -156,7 +187,7 @@ class TradingEnv(gym.Env):
     #Reders any visuals we desire
     def render(self, mode='human'):
         print("ACTION: " + str(self.last_action))
-        print("Current State" + "(share_price:{} funds:{} held_shares:{})".format(*self.sim.get_state()) + " " + f"volume_traded:{self.sim.volume_traded} past_volumes_traded:{self.sim.past_volumes_traded}")
+        print("Current State" + "(share_price:{} predicted_price: {} funds:{} held_shares:{})".format(*self.sim.get_state()) + " " + f"volume_traded:{self.sim.volume_traded} past_volumes_traded:{self.sim.past_volumes_traded}")
     
     #Close visuals
     def close(self):
@@ -174,10 +205,12 @@ if __name__ == "__main__":
     print("SHAPE: " + str(obs_dim))
     # Next, we build a very simple model.
     model = Sequential()
-    model.add(Dense(units=16, activation='relu', input_shape=(1,3)))
+    model.add(Dense(units=32, activation='relu', input_shape=(1,4)))
     model.add(Dense(units=8, activation='relu'))
     model.add(Dense(nb_actions))
+    model.add(Dense(units=2, activation='relu'))
     model.add(Activation('softmax'))
+    model.add(Dense(units=2, activation='relu'))
     model.add(Flatten())
 
     # Option 1 : Simple model
@@ -209,14 +242,13 @@ if __name__ == "__main__":
     # Okay, now it's time to learn something! We visualize the training here for show, but this
     # slows down training quite a lot. You can always safely abort the training prematurely using
     # Ctrl + C.
-    sarsa.fit(env, nb_steps=5000, visualize=False, verbose=2)
-
+    sarsa.fit(env, nb_steps=15000, visualize=False, verbose=2)
     # After training is done, we save the final weights.
     sarsa.save_weights('sarsa_{}_weights.h5f'.format("appl"), overwrite=True)
-
+    env.sim.past_volumes_traded = []
     # Finally, evaluate our algorithm for 5 episodes.
-    sarsa.test(env, nb_episodes=20, visualize=True)
-
+    h = sarsa.test(env, nb_episodes=50, nb_max_start_steps=5)
+    print(h.history['episode_reward'])
     # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
     # even the metrics!
     #memory = EpisodeParameterMemory(limit=1000, window_length=1)
