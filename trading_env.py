@@ -46,6 +46,7 @@ class Simulation:
         self.funds = STARTING_FUNDS
         self.held_shares = 0
         self.volume_traded = 0
+        self.past_volumes_traded = []
         
     #Advance 1 data point (Day/hr/min)
     def step(self):
@@ -89,9 +90,9 @@ class Simulation:
         self.index = 0
         self.funds = STARTING_FUNDS
         self.held_shares = 0
+        self.past_volumes_traded.append(self.volume_traded)
         self.volume_traded = 0
-        
-    
+
 
 #OpenAI Gym for Trading Simulation/Trading Agent
 class TradingEnv(gym.Env):
@@ -155,7 +156,7 @@ class TradingEnv(gym.Env):
     #Reders any visuals we desire
     def render(self, mode='human'):
         print("ACTION: " + str(self.last_action))
-        print("Current State" + str(self.sim.get_state()) + " " + str(self.sim.volume_traded))
+        print("Current State" + "(share_price:{} funds:{} held_shares:{})".format(*self.sim.get_state()) + " " + f"volume_traded:{self.sim.volume_traded} past_volumes_traded:{self.sim.past_volumes_traded}")
     
     #Close visuals
     def close(self):
@@ -208,13 +209,13 @@ if __name__ == "__main__":
     # Okay, now it's time to learn something! We visualize the training here for show, but this
     # slows down training quite a lot. You can always safely abort the training prematurely using
     # Ctrl + C.
-    sarsa.fit(env, nb_steps=50000, visualize=False, verbose=2)
+    sarsa.fit(env, nb_steps=5000, visualize=False, verbose=2)
 
     # After training is done, we save the final weights.
     sarsa.save_weights('sarsa_{}_weights.h5f'.format("appl"), overwrite=True)
 
     # Finally, evaluate our algorithm for 5 episodes.
-    sarsa.test(env, nb_episodes=5, visualize=True)
+    sarsa.test(env, nb_episodes=20, visualize=True)
 
     # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
     # even the metrics!
