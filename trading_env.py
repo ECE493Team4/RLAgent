@@ -26,11 +26,14 @@ from rl.memory import SequentialMemory, EpisodeParameterMemory
 
 STARTING_FUNDS = 5000
 TRANSACTION_SIZE = 10
+ML_MODEL_SUCC_PROB = 0.82 #NOTE: Alter this to gauge results
 Datafiles = ["aapl.us.txt","dis.us.txt","ge.us.txt","ibm.us.txt","intc.us.txt","jpm.us.txt","msft.us.txt","nke.us.txt","v.us.txt","wmt.us.txt"]
+#Datafiles = ["aapl.us.txt"]
 
 class AgentActions(Enum):
     Buy = 0
     Sell = 1
+    Hold = 2
     
 class Stock():
     def __init__(self,buy_price):
@@ -67,8 +70,9 @@ class Simulation:
                 share = Stock(self.get_price())
                 self.shares.append(share)
                 purchased_shares.append(share)
+            return 0
             #return self.calculateROI(purchased_shares, self.get_price(), "BUY")
-        return 0
+        return -1
         
     def sell_shares(self):
         fundsBefore = self.funds
@@ -84,7 +88,7 @@ class Simulation:
                 self.shares.remove(share)
                 sold_shares.append(share)
             return self.calculateROI(sold_shares, self.get_price(), "SELL")
-        return 0
+        return -1
         
     def calculateROI(self, shares, current_price, type="BUY"):
         if(type == "BUY"):
@@ -109,16 +113,22 @@ class Simulation:
         for share in all_shares:
             self.shares.remove(share)
             sold_shares.append(share)
-
-        def get_price(self):
-            return self.stocks_open[self.index]
         
     #TODO: Return features/state of current sim for RL Agent
     def get_state(self):
-        return (self.get_price(),self.funds, self.held_shares)
+        return (self.get_price(),self.get_predicted_price(), self.funds, self.held_shares)
         
     def get_price(self):
         return self.stocks_open[self.index]
+    
+    def get_predicted_price(self):
+        if(self.index+1 < len(self.stocks_open)):
+            if(np.random.random_sample(1) < ML_MODEL_SUCC_PROB):
+                return self.stocks_open[self.index+1]
+            else:
+                return self.get_price() + (self.get_price() - self.stocks_open[self.index+1]) #Add in the opposite direction of change
+        else:
+            return self.get_price()
     
     def reset(self):
         self.index = 0
@@ -131,6 +141,7 @@ class Simulation:
 #OpenAI Gym for Trading Simulation/Trading Agent
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
+    past_end_funds = []
     
     def __init__(self, dataset):
         self.sim = Simulation(dataset)
@@ -143,15 +154,17 @@ class TradingEnv(gym.Env):
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
+            np.finfo(np.float32).max,
         ])
         
         obs_domain_lower = np.array([
-            np.finfo(np.float32).max,
+            0,
+            0,
             0,
             0,
         ])
         
-        self.action_space = spaces.Discrete(2)
+        self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(obs_domain_lower, obs_domain_upper, dtype=np.float32)
         
         self.seed()
@@ -168,19 +181,23 @@ class TradingEnv(gym.Env):
     
     def swap_dataset(self, data):
         self.sim = Simulation(data)
+        self.past_end_funds = []
         self.reset()
       
     def step(self, action):
         assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         state = self.state
-        reward = 0
+        reward = -1
         done = False
         self.last_action = action
         #TODO: State update code
         if(action == 0): ##Buy
             reward = self.sim.buy_shares()
-        else: ##Sell
+        elif(action == 1): ##Sell
             reward = self.sim.sell_shares()
+        else: #Hold
+            if(state[3] > 0): #Held shares
+                reward = 0
         done = self.sim.step()
         #if(done):
         #    reward += self.sim.sell_all()
@@ -188,6 +205,7 @@ class TradingEnv(gym.Env):
         return np.array(self.state), reward, done, {}
       
     def reset(self):
+        self.past_end_funds.append(self.sim.funds + self.sim.get_price() * self.sim.held_shares)
         self.sim.reset()
         self.state = self.sim.get_state()
         return np.array(self.state)
@@ -195,7 +213,7 @@ class TradingEnv(gym.Env):
     #Reders any visuals we desire
     def render(self, mode='human'):
         print("ACTION: " + str(self.last_action))
-        print("Current State" + "(share_price:{} funds:{} held_shares:{})".format(*self.sim.get_state()) + " " + f"volume_traded:{self.sim.volume_traded} past_volumes_traded:{self.sim.past_volumes_traded}")
+        print("Current State" + "(share_price:{} predicted_price:{} funds:{} held_shares:{})".format(*self.sim.get_state()) + " " + f"volume_traded:{self.sim.volume_traded} past_volumes_traded:{self.sim.past_volumes_traded}")
     
     #Close visuals
     def close(self):
@@ -227,14 +245,14 @@ if __name__ == "__main__":
 
     # Option 2: deep network
     model = Sequential()
-    model.add(Dense(16, input_shape=(1,3)))
+    model.add(Dense(16, input_shape=(1,4)))
     model.add(Activation('relu'))
     model.add(Dense(16))
     model.add(Activation('relu'))
     model.add(Dense(16))
     model.add(Activation('relu'))
     model.add(Dense(nb_actions))
-    model.add(Activation('softmax'))
+    model.add(Activation('relu'))
     model.add(Flatten())
 
 
@@ -244,15 +262,15 @@ if __name__ == "__main__":
     policy = MaxBoltzmannQPolicy()
     #sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=1000, policy=policy)
     #sarsa.compile("adam", metrics=['mse'])
-    memory = SequentialMemory(limit=25000, window_length=1)
-    dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=100,policy=policy)
+    memory = SequentialMemory(limit=28860, window_length=1)
+    dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, gamma=1, nb_steps_warmup=100,policy=policy)
     dqn.compile("adam", metrics=['mse'])
 
     # Okay, now it's time to learn something! We visualize the training here for show, but this
     # slows down training quite a lot. You can always safely abort the training prematurely using
     # Ctrl + C.
     results = {}
-    count = 0
+    np.random.shuffle(Datafiles)
     for i in range(10):
         for data in Datafiles:
             if(data not in results):
@@ -260,25 +278,28 @@ if __name__ == "__main__":
             data_list = pd.read_csv("Data/"+data)
             print("Training: " + data)
             env.swap_dataset(data_list)
-            result = dqn.fit(env, nb_steps=1, visualize=False, verbose=1)
-            results[data].append((count, result.history))
-        count += 1
+            result = dqn.fit(env, nb_steps=28860, visualize=False, verbose=1)
+            print("Final Funds for " + data + ": " + str(env.past_end_funds))
+            results[data].append(sum(result.history["episode_reward"])/len(result.history["episode_reward"])) #Average the returns for all training episodes for this cycle
+
+   # results["aapl.us.txt"] = []
+   # result = dqn.fit(env, nb_steps=2000, visualize=False, verbose=1)
+   # results["aapl.us.txt"].append((count, result.history))
 
     # After training is done, we save the final weights.
     dqn.save_weights('dqn_{}_weights.h5f'.format("all"), overwrite=True)
     
     # Finally, evaluate our algorithm for 5 episodes.
-    test_res = dqn.test(env, nb_episodes=1, visualize=True)
-    cycle = 0
+    test_res = dqn.test(env, nb_episodes=200, visualize=False)
     for res in results:
-        for x in res:
-            line, = plt.plot(x, color = (random.random(),random.random(),random.random())) #Random color
-            line.set_label(res + ": " + str(cycle))
+        x = results[res]
+        line, = plt.plot([1,2,3,4,5,6,7,8,9,10], x, color = (random.random(),random.random(),random.random())) #Random color
+        line.set_label(res)
+            
         plt.ylabel("Episode Reward")
         plt.xlabel("Training Cycle")
         plt.legend()
         plt.show()
-        cycle += 1
     
     
     
