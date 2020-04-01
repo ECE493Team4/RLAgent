@@ -14,7 +14,7 @@ import numpy as np
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation
-from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Flatten, LSTM
 from tensorflow.keras.optimizers import Adam
 
 from rl.agents.cem import CEMAgent
@@ -28,7 +28,7 @@ STARTING_FUNDS = 5000
 TRANSACTION_SIZE = 10
 ML_MODEL_SUCC_PROB = 0.82 #NOTE: Alter this to gauge results
 Datafiles = ["aapl.us.txt","dis.us.txt","ge.us.txt","ibm.us.txt","intc.us.txt","jpm.us.txt","msft.us.txt","nke.us.txt","v.us.txt","wmt.us.txt"]
-#Datafiles = ["aapl.us.txt"]
+ValidatorFiles = ["dis.us.txt","aapl.us.txt","ibm.us.txt","nke.us.txt","v.us.txt","jpm.us.txt","msft.us.txt","wmt.us.txt","intc.us.txt","ge.us.txt",]
 
 class AgentActions(Enum):
     Buy = 0
@@ -72,7 +72,7 @@ class Simulation:
                 purchased_shares.append(share)
             return 0
             #return self.calculateROI(purchased_shares, self.get_price(), "BUY")
-        return -1
+        return -100 #Purchase W/O enough money
         
     def sell_shares(self):
         fundsBefore = self.funds
@@ -88,7 +88,7 @@ class Simulation:
                 self.shares.remove(share)
                 sold_shares.append(share)
             return self.calculateROI(sold_shares, self.get_price(), "SELL")
-        return -1
+        return -100 #Sell W/O any shares
         
     def calculateROI(self, shares, current_price, type="BUY"):
         if(type == "BUY"):
@@ -124,9 +124,17 @@ class Simulation:
     def get_predicted_price(self):
         if(self.index+1 < len(self.stocks_open)):
             if(np.random.random_sample(1) < ML_MODEL_SUCC_PROB):
-                return self.stocks_open[self.index+1]
-            else:
-                return self.get_price() + (self.get_price() - self.stocks_open[self.index+1]) #Add in the opposite direction of change
+                #return self.stocks_open[self.index+1]
+                if (self.stocks_open[self.index+1] > self.get_price()):
+                    return 1
+                else:
+                    return 0
+            else: #ML is wrong
+                #return self.get_price() + (self.get_price() - self.stocks_open[self.index+1]) #Add in the opposite direction of change
+                if (self.stocks_open[self.index+1] > self.get_price()): #Send false result
+                    return 0
+                else:
+                    return 1
         else:
             return self.get_price()
     
@@ -142,7 +150,7 @@ class Simulation:
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     past_end_funds = []
-    
+
     def __init__(self, dataset):
         self.sim = Simulation(dataset)
         
@@ -152,7 +160,7 @@ class TradingEnv(gym.Env):
         #Current: Stock price, funds, held shares
         obs_domain_upper = np.array([
             np.finfo(np.float32).max,
-            np.finfo(np.float32).max,
+            1, #Trend indicator
             np.finfo(np.float32).max,
             np.finfo(np.float32).max,
         ])
@@ -198,6 +206,8 @@ class TradingEnv(gym.Env):
         else: #Hold
             if(state[3] > 0): #Held shares
                 reward = 0
+            else:
+                reward = -100
         done = self.sim.step()
         #if(done):
         #    reward += self.sim.sell_all()
@@ -205,7 +215,8 @@ class TradingEnv(gym.Env):
         return np.array(self.state), reward, done, {}
       
     def reset(self):
-        self.past_end_funds.append(self.sim.funds + self.sim.get_price() * self.sim.held_shares)
+        #Keep track of held money / money including held assets
+        self.past_end_funds.append(str(self.sim.funds) + "/" + str(self.sim.funds + self.sim.get_price() * self.sim.held_shares) + "/" +str(self.sim.volume_traded))
         self.sim.reset()
         self.state = self.sim.get_state()
         return np.array(self.state)
@@ -223,8 +234,8 @@ if __name__ == "__main__":
     data_init = pd.read_csv("Data/aapl.us.txt")
     env = TradingEnv(data_init)
 
-    np.random.seed(123)
-    env.seed(123)
+    np.random.seed(314)
+    env.seed(314)
 
     nb_actions = env.action_space.n
     obs_dim = env.observation_space.shape[0]
@@ -245,78 +256,59 @@ if __name__ == "__main__":
 
     # Option 2: deep network
     model = Sequential()
-    model.add(Dense(16, input_shape=(1,4)))
-    model.add(Activation('relu'))
-    model.add(Dense(16))
-    model.add(Activation('relu'))
-    model.add(Dense(16))
+    model.add(LSTM(16, input_shape=(1,4), return_sequences=True))
+    model.add(Activation('tanh'))
+    model.add(LSTM(8)) #16
+    model.add(Activation('tanh'))
+    model.add(Dense(4)) #16
     model.add(Activation('relu'))
     model.add(Dense(nb_actions))
-    model.add(Activation('relu'))
+    model.add(Activation('softmax'))
     model.add(Flatten())
 
 
     print(model.summary())
 
 
-    policy = MaxBoltzmannQPolicy()
+    policy = BoltzmannQPolicy()
+    test_policy = MaxBoltzmannQPolicy()
     #sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=1000, policy=policy)
     #sarsa.compile("adam", metrics=['mse'])
-    memory = SequentialMemory(limit=28860, window_length=1)
-    dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, gamma=1, nb_steps_warmup=100,policy=policy)
+    memory = SequentialMemory(limit=50000, window_length=1)
+    #TODO: Experiment with LOW GAMMA VALUES... COMPUTE LOG(gamma)/LOG(0.5) = 8.... THIS MEANS 8 steps horizon till return is 0.5x its value.
+    dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, gamma=0.15, nb_steps_warmup=100,policy=policy, test_policy=test_policy)
     dqn.compile("adam", metrics=['mse'])
 
-    # Okay, now it's time to learn something! We visualize the training here for show, but this
-    # slows down training quite a lot. You can always safely abort the training prematurely using
-    # Ctrl + C.
-    results = {}
+    #Training
+    results = []
     np.random.shuffle(Datafiles)
+    np.random.shuffle(ValidatorFiles)
     for i in range(10):
+        validator = ValidatorFiles[i]
+        validation_data = pd.read_csv("Data/"+validator)
         for data in Datafiles:
-            if(data not in results):
-                results[data] = []
-            data_list = pd.read_csv("Data/"+data)
-            print("Training: " + data)
-            env.swap_dataset(data_list)
-            result = dqn.fit(env, nb_steps=28860, visualize=False, verbose=1)
-            print("Final Funds for " + data + ": " + str(env.past_end_funds))
-            results[data].append(sum(result.history["episode_reward"])/len(result.history["episode_reward"])) #Average the returns for all training episodes for this cycle
-
-   # results["aapl.us.txt"] = []
-   # result = dqn.fit(env, nb_steps=2000, visualize=False, verbose=1)
-   # results["aapl.us.txt"].append((count, result.history))
+            if(data != validator):
+                data_list = pd.read_csv("Data/"+data)
+                print("Training: " + data)
+                env.swap_dataset(data_list)
+                result = dqn.fit(env, nb_steps=28860, visualize=False, verbose=1)
+                print("Final train funds for " + data + ": " + str(env.past_end_funds))
+        print("Validating on: " + validator)
+        env.swap_dataset(validation_data)
+        test_res = dqn.test(env, nb_episodes=5, visualize=True)
+        print("Final Funds for " + validator + ": " + str(env.past_end_funds))
+        results.append(sum(test_res.history["episode_reward"])/len(test_res.history["episode_reward"])) #Average the returns for all training episodes for this cycle
 
     # After training is done, we save the final weights.
     dqn.save_weights('dqn_{}_weights.h5f'.format("all"), overwrite=True)
     
-    # Finally, evaluate our algorithm for 5 episodes.
-    test_res = dqn.test(env, nb_episodes=200, visualize=False)
-    for res in results:
-        x = results[res]
-        line, = plt.plot([1,2,3,4,5,6,7,8,9,10], x, color = (random.random(),random.random(),random.random())) #Random color
-        line.set_label(res)
-            
-        plt.ylabel("Episode Reward")
-        plt.xlabel("Training Cycle")
-        plt.legend()
-        plt.show()
+    line, = plt.plot([1,2,3,4,5,6,7,8,9,10], results, color = (random.random(),random.random(),random.random())) #Random color
+    line.set_label("Validation results")
+        
+    plt.ylabel("Episode Reward")
+    plt.xlabel("Training Cycle")
+    plt.legend()
+    plt.show()
+        
     
     
-    
-    # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
-    # even the metrics!
-    #memory = EpisodeParameterMemory(limit=1000, window_length=1)
-
-    #cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory,batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
-    #cem.compile()
-
-    # Okay, now it's time to learn something! We visualize the training here for show, but this
-    # slows down training quite a lot. You can always safely abort the training prematurely using
-    # Ctrl + C.
-    #cem.fit(env, nb_steps=100000, visualize=False, verbose=2)
-
-    # After training is done, we save the best weights.
-    #cem.save_weights('cem_{}_params.h5f'.format("stocks-v0"), overwrite=True)
-
-    # Finally, evaluate our algorithm for 5 episodes.
-    #cem.test(env, nb_episodes=5, visualize=True)
