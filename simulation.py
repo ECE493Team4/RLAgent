@@ -74,7 +74,8 @@ class Simulation:
 class TrainingSimulation(Simulation):
     STARTING_FUNDS = 5000 #Training
 
-    def __init__(self,data):
+    def __init__(self,data,name):
+        self.ticker = name
         self.data = data
         self.stocks_open = data["Open"]
         self.index = 0
@@ -129,7 +130,7 @@ class TrainingSimulation(Simulation):
         
     #Create trend indicator and return
     def get_predicted_price(self):
-        pred = self.controller.get_stock_prediction()
+        pred = self.controller.get_stock_prediction(self.ticker, self.index)
         if (pred[0] > self.get_price()):
             return 1
         else:
@@ -137,7 +138,7 @@ class TrainingSimulation(Simulation):
     
     def reset(self):
         self.index = 0
-        self.funds = STARTING_FUNDS
+        self.funds = self.STARTING_FUNDS
         self.held_shares = 0
         self.past_volumes_traded.append(self.volume_traded)
         self.volume_traded = 0

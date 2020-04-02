@@ -32,7 +32,7 @@ ValidatorFiles = ["dis.us.txt","aapl.us.txt","ibm.us.txt","nke.us.txt","v.us.txt
 
 if __name__ == "__main__":
     data_init = pd.read_csv("Data/aapl.us.txt")
-    env = TradingEnv(data_init)
+    env = TradingEnv(data_init,"aapl")
 
     np.random.seed(314)
     env.seed(314)
@@ -77,7 +77,7 @@ if __name__ == "__main__":
             if(data != validator):
                 data_list = pd.read_csv("Data/"+data)
                 print("Training: " + data)
-                env.swap_dataset(data_list)
+                env.swap_dataset(data_list, data.split(".")[0])
                 result = dqn.fit(env, nb_steps=28860, visualize=False, verbose=1)
                 print("Final train funds for " + data + ": " + str(env.past_end_funds))
         print("Validating on: " + validator)
