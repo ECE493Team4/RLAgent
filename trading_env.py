@@ -176,7 +176,6 @@ class TradingEnv(gym.Env):
         self.seed()
         self.state = None
         self.last_action = None
-
         return
       
     #TODO: Seed
@@ -196,7 +195,6 @@ class TradingEnv(gym.Env):
         reward = -1
         done = False
         self.last_action = action
-        #TODO: State update code
         if(action == 0): ##Buy
             reward = self.sim.buy_shares()
         elif(action == 1): ##Sell
@@ -205,7 +203,7 @@ class TradingEnv(gym.Env):
             if(state[3] > 0): #Held shares
                 reward = 0
             else:
-                reward = -100
+                reward = -100 #No action w/o any held shares
         done = self.sim.step()
         #if(done):
         #    reward += self.sim.sell_all()
