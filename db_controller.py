@@ -1,6 +1,7 @@
 import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
+from datetime import datetime, timedelta
 
 
 class postgresql_db_config:
@@ -43,8 +44,10 @@ class DBController():
         #1. Sum BUY's
         #2. Sum SELL's
         #3. Compute and return diff
-        sql ="select trade_type,price,SUM(volume) from public.trade where session_id = '"+sid+"' GROUP BY trade_type,price"
-        data = sqlio.read_sql_query(sql, postgre_db)
+        sql ="select trade_type,price,SUM(volume) from public.trade where session_id = '"+str(sid)+"' GROUP BY trade_type,price"
+        db = self.get_connection()
+        data = sqlio.read_sql_query(sql, db)
+        db.close()
         held_stocks = 0
         for trade in data.itertuples():
             _, t_type, price, vol = trade
@@ -72,7 +75,7 @@ class DBController():
         db = self.get_connection()
         cur = db.cursor()
         #Format date, no time-zone.
-        time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cur.execute(sql, (price,trade_type,volume,time,session))
         db.commit()
         cur.close()

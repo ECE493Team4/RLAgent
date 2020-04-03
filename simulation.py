@@ -13,21 +13,12 @@ import matplotlib.pyplot as plt
 import gym
 import numpy as np
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Activation
-from tensorflow.keras.layers import Flatten, LSTM
-from tensorflow.keras.optimizers import Adam
-
-from rl.agents.cem import CEMAgent
-from rl.agents import SARSAAgent, DQNAgent
-from rl.policy import MaxBoltzmannQPolicy,BoltzmannQPolicy
-from rl.memory import SequentialMemory, EpisodeParameterMemory
-
 
 class AgentActions(Enum):
     Buy = 0
     Sell = 1
     Hold = 2
+    SellAll = 3
     
 class Stock():
     def __init__(self,buy_price):
@@ -55,7 +46,7 @@ class Simulation:
         for stock in shares:
             profit += (current_price - (stock.buy_price))
             cost += stock.buy_price
-        return (profit/cost)
+        return (profit/cost) * 100 ## Scale reward by 100 for sells
       
     #Get observable state
     def get_state(self):
@@ -73,11 +64,13 @@ class Simulation:
     
 class TrainingSimulation(Simulation):
     STARTING_FUNDS = 5000 #Training
+    ML_MODEL_SUCC_PROB = 0.82
 
     def __init__(self,data,name):
         self.ticker = name
         self.data = data
-        self.stocks_open = data["Open"]
+        if(len(data) > 0):
+            self.stocks_open = data["Open"].round(decimals=2) #State aggr
         self.index = 0
         self.funds = self.STARTING_FUNDS
         self.held_shares = 0
@@ -95,7 +88,8 @@ class TrainingSimulation(Simulation):
     def buy_shares(self, purch_size):
         fundsBefore = self.funds
         if(self.funds - (purch_size*self.get_price()) >= 0):
-            self.funds -= purch_size*self.get_price()
+            self.funds -= purch_size * self.get_price()
+            self.funds = round(self.funds,2)
             self.held_shares += purch_size
             
             purchased_shares = []
@@ -109,7 +103,8 @@ class TrainingSimulation(Simulation):
     def sell_shares(self,purch_size):
         fundsBefore = self.funds
         if(self.held_shares >= purch_size):
-            self.funds += purch_size*self.get_price()
+            self.funds += purch_size * self.get_price()
+            self.funds = round(self.funds,2)
             self.held_shares -= purch_size
             self.volume_traded += purch_size
             
@@ -119,8 +114,17 @@ class TrainingSimulation(Simulation):
                 share = all_shares[i]
                 self.shares.remove(share)
                 sold_shares.append(share)
-            return super.calculateROI(sold_shares, self.get_price())
+            return self.calculateROI(sold_shares, self.get_price())
         return -100 #Sell W/O any shares
+    
+    def sell_all(self):
+        self.funds += self.held_shares * self.get_price()
+        self.funds = round(self.funds,2)
+        self.volume_traded += self.held_shares
+        reward = self.calculateROI(self.shares, self.get_price())
+        self.shares = []
+        self.held_shares = 0
+        return reward
     
     def get_state(self):
         return (self.get_price(),self.get_predicted_price(), self.funds, self.held_shares)
@@ -128,13 +132,33 @@ class TrainingSimulation(Simulation):
     def get_price(self):
         return self.stocks_open[self.index]
         
-    #Create trend indicator and return
+        
     def get_predicted_price(self):
-        pred = self.controller.get_stock_prediction(self.ticker, self.index)
-        if (pred[0] > self.get_price()):
-            return 1
+        if(self.index+1 >= len(self.stocks_open)):
+            if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
+                return 1
+            else:
+                return 0
+        if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
+            if(self.stocks_open[self.index+1] > self.get_price()):
+                return 1
+            else:
+                return 0
         else:
-            return 0
+            if(self.stocks_open[self.index+1] > self.get_price()):
+                return 0
+            else:
+                return 1
+        
+    #Create trend indicator and return (This is a form of state aggr)
+    #def get_predicted_price(self):
+    #    print(self.ticker, self.index)
+    #    pred = self.controller.get_stock_prediction(self.ticker, self.index)
+    #    print(pred, self.get_price())
+    #    if (pred["prediction"][0][0] > self.get_price()):
+     #       return 1
+     #   else:
+     #       return 0
     
     def reset(self):
         self.index = 0
@@ -147,7 +171,7 @@ class TrainingSimulation(Simulation):
 #the data points used for training.
 #NOTE: This sim is used specifically for the project DEMO
 class HistoricalSimulation(Simulation):
-    def __init__(self,controller,ticker):
+    def __init__(self,controller):
         self.controller = controller
         
     #Advance 1 data point (Day/hr/min)
@@ -159,6 +183,7 @@ class HistoricalSimulation(Simulation):
         price = self.get_price(ticker)
         if(user_bank - (purch_size*price) >= 0):
             user_bank -= purch_size*price
+            user_bank = round(user_bank,2)
             self.controller.add_session_trade(price, "BUY", purch_size, sid)
             self.controller.update_user_funds(user_id, user_bank)
             return
@@ -169,25 +194,26 @@ class HistoricalSimulation(Simulation):
         price = self.get_price(ticker)
         if(held_shares >= sell_size):
             user_bank += sell_size*price
+            user_bank = round(user_bank,2)
             self.controller.add_session_trade(price, "SELL", sell_size, sid)
             self.controller.update_user_funds(user_id, user_bank)
             return
         return
       
     #Get observable state
-    def get_state(self,sid,user):
+    def get_state(self,sid,user_bank,ticker,time):
         held_shares = self.controller.get_held_shares(sid)
-        return (self.get_price(),self.get_predicted_price(), user.funds, user.held_shares)
+        return (self.get_price(ticker,time),self.get_predicted_price(ticker,time), user_bank, held_shares)
       
     #Get open price of stock
     def get_price(self,ticker,time):
-        price = self.controller.get_stock_price(ticker,time)
-        return price
+        price = self.controller.get_stock_price(ticker,time)[0]
+        return round(price,2)
         
     #Query and return predicted price
     def get_predicted_price(self,ticker,time):
-        pred = self.controller.get_stock_prediction()
-        if (pred[0] > self.get_price()):
+        pred = self.controller.get_stock_prediction(ticker,time)
+        if (pred[0][0] > self.get_price(ticker,time)):
             return 1
         else:
             return 0

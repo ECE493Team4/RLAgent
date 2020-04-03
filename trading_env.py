@@ -29,6 +29,7 @@ class AgentActions(Enum):
     Buy = 0
     Sell = 1
     Hold = 2
+    SellAll = 3
     
 class Stock():
     def __init__(self,buy_price):
@@ -41,9 +42,6 @@ class TradingEnv(gym.Env):
 
     def __init__(self, dataset, ticker):
         self.sim = Simulation(dataset, ticker)
-        
-        #Standard stock vals only ATM
-        #TODO: Add more features (Funds, ML Pred, Etc.)
         
         #Current: Stock price, funds, held shares
         obs_domain_upper = np.array([
@@ -60,7 +58,8 @@ class TradingEnv(gym.Env):
             0,
         ])
         
-        self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Discrete(4)
+        #self.action_space = spaces.Box(np.array([0,0]), np.array([10,10]), dtype=np.float32) #Max 10 buys, 10 sells.
         self.observation_space = spaces.Box(obs_domain_lower, obs_domain_upper, dtype=np.float32)
         
         self.seed()
@@ -86,14 +85,19 @@ class TradingEnv(gym.Env):
         done = False
         self.last_action = action
         if(action == 0): ##Buy
-            reward = self.sim.buy_shares()
+            reward = self.sim.buy_shares(1)
         elif(action == 1): ##Sell
-            reward = self.sim.sell_shares()
-        else: #Hold
+            reward = self.sim.sell_shares(1)
+        elif(action == 2): #Hold
             if(state[3] > 0): #Held shares
                 reward = 0
             else:
                 reward = -100 #No action w/o any held shares
+        else:
+            if(state[3] > 0):
+                reward = self.sim.sell_all()
+            else:
+                reward = -100 #Sell w/o shares
         done = self.sim.step()
         #if(done):
         #    reward += self.sim.sell_all()
