@@ -40,7 +40,7 @@ class TradingAgent():
     def build_agent(self):
         #Create a dummy env to get size of input/output.
         #Makes it simpler if we ever choose to update env shapes.
-        env = TradingEnv([],"")
+        env = TradingEnv([],"",[])
         np.random.seed(117)
         env.seed(117)
         
@@ -85,17 +85,19 @@ if __name__ == "__main__":
     for i in range(10):
         validator = ValidatorFiles[i]
         validation_data = pd.read_csv("Data/"+validator)
+        validation_pred = pd.read_csv("Data/"+validator.split(".")[0]+"_pred.csv")
         for data in Datafiles:
             if(data != validator):
                 data_list = pd.read_csv("Data/"+data)
+                data_pred = pd.read_csv("Data/"+data.split(".")[0]+"_pred.csv")
                 print("Training: " + data)
-                env.swap_dataset(data_list, data.split(".")[0])
-                result = agent.fit(env, nb_steps=28860, visualize=False, verbose=1)
+                env.swap_dataset(data_list,data_pred,data.split(".")[0])
+                result = agent.fit(env, nb_steps=1333, visualize=False, verbose=1) #Episode length is 1433 - 100 (Warmup steps) to cover historical train set
                 print("Final train funds for " + data + ": " + str(env.past_end_funds))
         print("Validating on: " + validator)
-        env.swap_dataset(validation_data, validator.split(".")[0])
-        test_res = agent.test(env, nb_episodes=5, visualize=True)
-        print("Final Funds for " + validator + ": " + str(env.past_end_funds))
+        env.swap_dataset(validation_data,validation_pred,validator.split(".")[0])
+        test_res = agent.test(env, nb_episodes=5, visualize=False, verbose=1)
+        print("Final Funds for " + validator + ": " + str(env.past_end_funds[2:])) #Drop first 2 as env calls reset()2 times prior to training adding 2 false results
         results.append(sum(test_res.history["episode_reward"])/len(test_res.history["episode_reward"])) #Average the returns for all training episodes for this cycle
 
     # After training is done, we save the final weights.

@@ -40,8 +40,8 @@ class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     past_end_funds = []
 
-    def __init__(self, dataset, ticker):
-        self.sim = Simulation(dataset, ticker)
+    def __init__(self, dataset, data_pred, ticker):
+        self.sim = Simulation(dataset, ticker, data_pred)
         
         #Current: Stock price, funds, held shares
         obs_domain_upper = np.array([
@@ -73,8 +73,8 @@ class TradingEnv(gym.Env):
       return [seed]
       
     
-    def swap_dataset(self, data, new_name):
-        self.sim = Simulation(data, new_name)
+    def swap_dataset(self, data, data_pred, new_name):
+        self.sim = Simulation(data, new_name, data_pred)
         self.past_end_funds = []
         self.reset()
       

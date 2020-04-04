@@ -65,14 +65,16 @@ class Simulation:
 class TrainingSimulation(Simulation):
     STARTING_FUNDS = 5000 #Training
     ML_MODEL_SUCC_PROB = 0.82
-    prev0 = None #oldest LSTM state
-    prev1 = None #n-1 LSTM state
 
-    def __init__(self,data,name):
+    def __init__(self,data,name,pred_data):
         self.ticker = name
         self.data = data
+        self.pred_data = pred_data
         if(len(data) > 0):
-            self.stocks_open = data["Open"].round(decimals=2) #State aggr
+            self.stocks_open = pd.to_numeric(data["Open"], downcast="float")
+            self.stocks_open = self.stocks_open.round(decimals=2) #State aggr
+        if(len(pred_data) > 0):
+            self.stocks_pred = pred_data["prediction"] #No round on this as we dont use true vals
         self.index = 2 #start at 2 so LSTM input is shape (3,4)
         self.funds = self.STARTING_FUNDS
         self.held_shares = 0
@@ -83,8 +85,6 @@ class TrainingSimulation(Simulation):
     
     #Advance 1 data point (Day/hr/min)
     def step(self):
-        self.prev0 = self.prev1
-        self.prev1 = self.state_now
         self.index += 1
         done = (self.index == len(self.stocks_open)-1)
         return done
@@ -132,39 +132,37 @@ class TrainingSimulation(Simulation):
     
     def get_state(self):
         self.state_now = np.array([self.get_price(),self.get_predicted_price(),self.funds, self.held_shares])
-        r = np.array([self.prev0, self.prev1, self.state_now])
         return self.state_now
     
     def get_price(self):
         return self.stocks_open[self.index]
         
-        
-    def get_predicted_price(self):
-        if(self.index+1 >= len(self.stocks_open)):
-            if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
-                return 1
-            else:
-                return 0
-        if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
-            if(self.stocks_open[self.index+1] > self.get_price()):
-                return 1
-            else:
-                return 0
-        else:
-            if(self.stocks_open[self.index+1] > self.get_price()):
-                return 0
-            else:
-                return 1
+    #For simulated ML Predictions
+    #def get_predicted_price(self):
+    #    if(self.index+1 >= len(self.stocks_open)):
+    #        if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
+    #            return 1
+    #        else:
+    #            return 0
+    #    if(np.random.random_sample(1) < self.ML_MODEL_SUCC_PROB): #correct
+    #        if(self.stocks_open[self.index+1] > self.get_price()):
+    #            return 1
+    #        else:
+    #            return 0
+    #    else:
+    #        if(self.stocks_open[self.index+1] > self.get_price()):
+    #            return 0
+    #        else:
+    #            return 1
         
     #Create trend indicator and return (This is a form of state aggr)
-    #def get_predicted_price(self):
-    #    print(self.ticker, self.index)
-    #    pred = self.controller.get_stock_prediction(self.ticker, self.index)
-    #    print(pred, self.get_price())
-    #    if (pred["prediction"][0][0] > self.get_price()):
-     #       return 1
-     #   else:
-     #       return 0
+    def get_predicted_price(self):
+        pred = self.stocks_pred[self.index]
+        pred = pred.replace("{","").replace("}","").split(",")
+        if (float(pred[0]) > self.get_price()):
+            return 1
+        else:
+            return 0
     
     def reset(self):
         self.index = 0
