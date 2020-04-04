@@ -37,7 +37,7 @@ class TradingService():
         #2. Load memory
         #3. Load policy
         #4. init agent with params
-        trader = TradingAgent()
+        trader = TradingAgent(mem_file="training_memory.dat")
         self.agent = trader.agent
         #TODO: Make live default during production
         if (self.serv_type == "LIVE"):
