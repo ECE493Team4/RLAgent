@@ -2,7 +2,7 @@ import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime, timedelta
-
+from yahoo_finance import Share
 
 class postgresql_db_config:
     NAME = 'stock_data'
@@ -29,6 +29,13 @@ class DBController():
         data = sqlio.read_sql_query(sql, db)
         db.close()
         return data.open
+        
+    #returns the current stock price for a ticker
+    def get_live_stock_price(self, ticker):
+        yahoo = Share(ticker)
+        yahoo.refresh()
+        price = yahoo.get_price() #String
+        return float(price)
         
     #Returns the prediction for a ticker at a given time
     def get_stock_prediction(self, ticker, time):

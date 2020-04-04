@@ -102,14 +102,14 @@ class TradingEnv(gym.Env):
         #if(done):
         #    reward += self.sim.sell_all()
         self.state = self.sim.get_state()
-        return np.array(self.state), reward, done, {}
+        return self.state, reward, done, {}
       
     def reset(self):
         #Keep track of held money / money including held assets
         self.past_end_funds.append(str(self.sim.funds) + "/" + str(self.sim.funds + self.sim.get_price() * self.sim.held_shares) + "/" +str(self.sim.volume_traded))
         self.sim.reset()
         self.state = self.sim.get_state()
-        return np.array(self.state)
+        return self.state
       
     #Reders any visuals we desire
     def render(self, mode='human'):

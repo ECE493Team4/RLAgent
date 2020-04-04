@@ -65,13 +65,15 @@ class Simulation:
 class TrainingSimulation(Simulation):
     STARTING_FUNDS = 5000 #Training
     ML_MODEL_SUCC_PROB = 0.82
+    prev0 = None #oldest LSTM state
+    prev1 = None #n-1 LSTM state
 
     def __init__(self,data,name):
         self.ticker = name
         self.data = data
         if(len(data) > 0):
             self.stocks_open = data["Open"].round(decimals=2) #State aggr
-        self.index = 0
+        self.index = 2 #start at 2 so LSTM input is shape (3,4)
         self.funds = self.STARTING_FUNDS
         self.held_shares = 0
         self.volume_traded = 0
@@ -81,6 +83,8 @@ class TrainingSimulation(Simulation):
     
     #Advance 1 data point (Day/hr/min)
     def step(self):
+        self.prev0 = self.prev1
+        self.prev1 = self.state_now
         self.index += 1
         done = (self.index == len(self.stocks_open)-1)
         return done
@@ -127,7 +131,9 @@ class TrainingSimulation(Simulation):
         return reward
     
     def get_state(self):
-        return (self.get_price(),self.get_predicted_price(), self.funds, self.held_shares)
+        self.state_now = np.array([self.get_price(),self.get_predicted_price(),self.funds, self.held_shares])
+        r = np.array([self.prev0, self.prev1, self.state_now])
+        return self.state_now
     
     def get_price(self):
         return self.stocks_open[self.index]
@@ -166,6 +172,13 @@ class TrainingSimulation(Simulation):
         self.held_shares = 0
         self.past_volumes_traded.append(self.volume_traded)
         self.volume_traded = 0
+        
+        #Advance 2 so LSTM input is available
+        self.get_state()
+        self.step()
+        self.get_state()
+        self.step()
+        
 
 #Simulation that serves data stepping through
 #the data points used for training.
@@ -218,9 +231,52 @@ class HistoricalSimulation(Simulation):
         else:
             return 0
 
-#TODO: complete
 #Simulation that hooks into live datasource and queries
 #Actual stock ticker data
 class LiveSimulation(Simulation):
     def __init__(self,controller):
         self.controller = controller
+        
+    #Advance 1 data point (Day/hr/min)
+    def step(self):
+        pass
+    
+    #Purchase shares
+    def buy_shares(self, purch_size, user_id, user_bank, ticker, sid):
+        price = self.get_price(ticker)
+        if(user_bank - (purch_size*price) >= 0):
+            user_bank -= purch_size*price
+            user_bank = round(user_bank,2)
+            self.controller.add_session_trade(price, "BUY", purch_size, sid)
+            self.controller.update_user_funds(user_id, user_bank)
+            return
+        return
+        
+    #Sell
+    def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid):
+        price = self.get_price(ticker)
+        if(held_shares >= sell_size):
+            user_bank += sell_size*price
+            user_bank = round(user_bank,2)
+            self.controller.add_session_trade(price, "SELL", sell_size, sid)
+            self.controller.update_user_funds(user_id, user_bank)
+            return
+        return
+      
+    #Get observable state
+    def get_state(self,sid,user_bank,ticker,time):
+        held_shares = self.controller.get_held_shares(sid)
+        return (self.get_price(ticker,time),self.get_predicted_price(ticker,time), user_bank, held_shares)
+      
+    #Get open price of stock
+    def get_price(self,ticker,time):
+        price = self.controller.get_live_stock_price(ticker,time)[0]
+        return round(price,2)
+        
+    #Query and return predicted price as trend indicator
+    def get_predicted_price(self,ticker,time):
+        pred = self.controller.get_stock_prediction(ticker,time)
+        if (pred[0][0] > self.get_price(ticker,time)):
+            return 1
+        else:
+            return 0
