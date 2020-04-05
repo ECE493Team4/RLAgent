@@ -102,7 +102,7 @@ class TrainingSimulation(Simulation):
                 self.shares.append(share)
                 purchased_shares.append(share)
             return 0
-        return -100 #Purchase W/O enough money
+        return -1000 #Purchase W/O enough money
     
     def sell_shares(self,purch_size):
         fundsBefore = self.funds
@@ -119,7 +119,7 @@ class TrainingSimulation(Simulation):
                 self.shares.remove(share)
                 sold_shares.append(share)
             return self.calculateROI(sold_shares, self.get_price())
-        return -100 #Sell W/O any shares
+        return -1000 #Sell W/O any shares
     
     def sell_all(self):
         self.funds += self.held_shares * self.get_price()

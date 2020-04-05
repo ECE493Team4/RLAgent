@@ -41,7 +41,7 @@ class TradingService():
         self.agent = trader.agent
         #TODO: Make live default during production
         if (self.serv_type == "LIVE"):
-            self.sim = LiveSimulation()
+            self.sim = LiveSimulation(self.controller)
         else:
             self.sim = HistoricalSimulation(self.controller)
     

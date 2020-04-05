@@ -39,6 +39,8 @@ class Stock():
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     past_end_funds = []
+    past_funds = []
+    past_action_map = [0,0,0,0] #simple count of all actions taken, mapped by idx
 
     def __init__(self, dataset, data_pred, ticker):
         self.sim = Simulation(dataset, ticker, data_pred)
@@ -76,6 +78,8 @@ class TradingEnv(gym.Env):
     def swap_dataset(self, data, data_pred, new_name):
         self.sim = Simulation(data, new_name, data_pred)
         self.past_end_funds = []
+        self.past_funds = []
+        self.past_action_map = [0,0,0,0]
         self.reset()
       
     def step(self, action):
@@ -84,6 +88,7 @@ class TradingEnv(gym.Env):
         reward = -1
         done = False
         self.last_action = action
+        self.past_action_map[action] += 1
         if(action == 0): ##Buy
             reward = self.sim.buy_shares(1)
         elif(action == 1): ##Sell
@@ -92,12 +97,12 @@ class TradingEnv(gym.Env):
             if(state[3] > 0): #Held shares
                 reward = 0
             else:
-                reward = -100 #No action w/o any held shares
+                reward = -1000 #No action w/o any held shares
         else:
             if(state[3] > 0):
                 reward = self.sim.sell_all()
             else:
-                reward = -100 #Sell w/o shares
+                reward = -1000 #Sell w/o shares
         done = self.sim.step()
         #if(done):
         #    reward += self.sim.sell_all()
@@ -106,6 +111,7 @@ class TradingEnv(gym.Env):
       
     def reset(self):
         #Keep track of held money / money including held assets
+        self.past_funds.append(self.sim.funds + self.sim.get_price() * self.sim.held_shares)
         self.past_end_funds.append(str(self.sim.funds) + "/" + str(self.sim.funds + self.sim.get_price() * self.sim.held_shares) + "/" +str(self.sim.volume_traded))
         self.sim.reset()
         self.state = self.sim.get_state()
