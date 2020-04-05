@@ -190,8 +190,8 @@ class HistoricalSimulation(Simulation):
         pass
     
     #Purchase shares
-    def buy_shares(self, purch_size, user_id, user_bank, ticker, sid):
-        price = self.get_price(ticker)
+    def buy_shares(self, purch_size, user_id, user_bank, ticker, sid,num_trades):
+        price = self.get_price(ticker,num_trades)
         if(user_bank - (purch_size*price) >= 0):
             user_bank -= purch_size*price
             user_bank = round(user_bank,2)
@@ -201,14 +201,22 @@ class HistoricalSimulation(Simulation):
         return
         
     #Sell
-    def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid):
-        price = self.get_price(ticker)
+    def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid,num_trades):
+        price = self.get_price(ticker,num_trades)
         if(held_shares >= sell_size):
             user_bank += sell_size*price
             user_bank = round(user_bank,2)
             self.controller.add_session_trade(price, "SELL", sell_size, sid)
             self.controller.update_user_funds(user_id, user_bank)
             return
+        return
+        
+    def sell_all(self,held_shares,user_id,user_bank,ticker,sid):
+        price = self.get_price(ticker)
+        user_bank += held_shares*price
+        user_bank = round(user_bank,2)
+        self.controller.add_session_trade(price, "SELL", held_shares, sid)
+        self.controller.update_user_funds(user_id, user_bank)
         return
       
     #Get observable state

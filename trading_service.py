@@ -23,9 +23,7 @@ class AgentActions(Enum):
 
 
 class TradingService():
-    #TODO: Simulation -> 1 for each stock?
     
-    #TODO: Determine time syncing
     agent = None
     time = None
     sim = None
@@ -33,13 +31,8 @@ class TradingService():
     
     def __init__(self, type = "HIST"):
         self.serv_type = type
-        #1. Load weights
-        #2. Load memory
-        #3. Load policy
-        #4. init agent with params
-        trader = TradingAgent(mem_file="training_memory.dat")
+        trader = TradingAgent(mem_file="training_memory_final.dat",w_file="weights_final.h5")
         self.agent = trader.agent
-        #TODO: Make live default during production
         if (self.serv_type == "LIVE"):
             self.sim = LiveSimulation(self.controller)
         else:
@@ -58,13 +51,24 @@ class TradingService():
                 sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
                 user = self.controller.get_user(username)
                 user_funds = user.bank[0]
+                user_id = user.id[0]
+                held_shares = self.controller.get_held_shares(sid)
                 state = self.get_state(sid, ticker, user_funds, num_trades)
+                curr_price = state[0], state[2],
                 action = self.take_action(state)
-                
-                #TODO: Record changes
-                #1. Write user/session/trades changes to DB
+                t_type = None
+                if action == 0:
+                    self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
+                elif action == 1:
+                    self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
+                elif action == 3:
+                    self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
+                else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
+                    pass
+                                
+                self.controller.update_start_time(sid)
+                self.controller.update_session_trades(sid,num_trades+1)
                 #2. Log action to graylog, DB
-            pass
 
     def take_action(self,state):
         #1. Take action using
@@ -85,5 +89,5 @@ if __name__ == "__main__":
         serv_type = args[1]
     else:
         serv_type = "HIST"
-    print("Launching server for: "+serv_type+" config")
+    print("Launching rl agent for: "+serv_type+" config")
     serv = TradingService(serv_type)

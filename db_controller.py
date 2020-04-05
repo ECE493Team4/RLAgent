@@ -24,7 +24,7 @@ class DBController():
     #Returns the stock price for a given ticker at a given time
     def get_stock_price(self, ticker, time):
         #Get Nth row. (Its impossible to keep date/times syncd)
-        sql = "SELECT * FROM (select ROW_NUMBER() OVER (ORDER BY time_stamp asc) AS RowNum, time_stamp, open from public.stock_data_full where stock_name = '"+ticker+"') as row WHERE RowNum = '"+str(time+1)+"'" #NOTE: Time is an index in historical case
+        sql = "SELECT * FROM (select ROW_NUMBER() OVER (ORDER BY time_stamp asc) AS RowNum, time_stamp, open from public.stock_data_full where stock_name = '"+ticker+"') as row WHERE RowNum = '"+str(int(time+1))+"'" #NOTE: Time is an index in historical case
         db = self.get_connection()
         data = sqlio.read_sql_query(sql, db)
         db.close()
@@ -40,7 +40,7 @@ class DBController():
     #Returns the prediction for a ticker at a given time
     def get_stock_prediction(self, ticker, time):
         #Get Nth row. (Its impossible to keep date/times syncd)
-        sql = "SELECT * FROM (select ROW_NUMBER() OVER (ORDER BY time_stamp asc) AS RowNum, time_stamp, prediction from public.stock_prediciton where stock_name = '"+ticker+"') as row WHERE RowNum = '"+str(time+1)+"'" #NOTE: Time is an index in historical case
+        sql = "SELECT * FROM (select ROW_NUMBER() OVER (ORDER BY time_stamp asc) AS RowNum, time_stamp, prediction from public.stock_prediction where stock_name = '"+ticker+"') as row WHERE RowNum = '"+str(int(time+1))+"'" #NOTE: Time is an index in historical case
         db = self.get_connection()
         data = sqlio.read_sql_query(sql, db)
         db.close()
@@ -70,13 +70,13 @@ class DBController():
         WHERE id = (%s)"""
         db = self.get_connection()
         cur = db.cursor()
-        cur.execute(sql, (new_bank,uuid))
+        cur.execute(sql, (new_bank.item(),uuid.item())) #.item() converts new_bank to native python type
         db.commit()
         cur.close()
         db.close()
         return
         
-    def add_session_trade(self,price,type,volume,session):
+    def add_session_trade(self,price,trade_type,volume,session):
         sql = """INSERT INTO public.trade(price, trade_type, volume, time_stamp, session_id)
         VALUES ((%s), (%s), (%s), (%s), (%s))"""
         db = self.get_connection()
@@ -93,7 +93,7 @@ class DBController():
         sql = """UPDATE public.trading_session SET start_time = (%s) WHERE session_id = (%s)"""
         db = self.get_connection()
         cur = db.cursor()
-        next_time = (datetime.now() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+        next_time = (datetime.now() + timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
         cur.execute(sql, (next_time,session))
         db.commit()
         cur.close()

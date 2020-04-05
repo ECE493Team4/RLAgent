@@ -10,15 +10,14 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Activation, Dropout
 from tensorflow.keras.layers import Flatten, LSTM
 from tensorflow.keras.optimizers import Adam
 
-from rl.agents.cem import CEMAgent
-from rl.agents import SARSAAgent, DQNAgent
+from rl.agents import DQNAgent
 from rl.policy import MaxBoltzmannQPolicy,BoltzmannQPolicy, EpsGreedyQPolicy
-from rl.memory import SequentialMemory, EpisodeParameterMemory
+from rl.memory import SequentialMemory
 
 #Depending on python version/installed dependencies there may be issues with this module
 try:
@@ -36,10 +35,10 @@ EPS_VAL = 0.1
 class TradingAgent():
     agent = None
 
-    def __init__(self,mem_file=None):
-        self.agent, self.env, self.memory = self.build_agent(mem_file)
+    def __init__(self,mem_file=None,w_file=None):
+        self.agent, self.env, self.memory = self.build_agent(mem_file,w_file)
         
-    def build_agent(self,mem_file=None):
+    def build_agent(self,mem_file=None,w_file=None):
         #Create a dummy env to get size of input/output.
         #Makes it simpler if we ever choose to update env shapes.
         env = TradingEnv([],"",[])
@@ -48,7 +47,6 @@ class TradingAgent():
         
         nb_actions = env.action_space.n
         obs_dim = env.observation_space.shape[0]
-    
         model = Sequential()
         model.add(LSTM(5, input_shape=(7,4), return_sequences=True)) # 4 features + 1 bias term. 5 neurons
         model.add(Activation('tanh'))
@@ -59,23 +57,26 @@ class TradingAgent():
         model.add(Activation('relu'))
         model.add(Dense(nb_actions))
         model.add(Activation('linear')) #Best activation for BoltzmanPolicy
-        #model.add(Flatten())
+            
 
         #policy = EpsGreedyQPolicy(eps=EPS_VAL) #Off policy
         policy = BoltzmannQPolicy() #Off-policy
         test_policy = MaxBoltzmannQPolicy() #On-policy
         
         if mem_file is None:
-            memory = SequentialMemory(limit=10000, window_length=7) ## returns observations of len (7,)
+            memory = SequentialMemory(limit=50000, window_length=7) ## returns observations of len (7,)
         else:
             (memory,memory.actions,memory.rewards, memory.terminals, memory.observations) = pickle.load(open(mem_file, "rb"))
+            
+        
         dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, gamma=GAMMA_VAL, nb_steps_warmup=100,policy=policy, test_policy=test_policy)
         dqn.compile("adam", metrics=['mse'])
+        
+        if w_file is not None:
+            model.load_weights(w_file)
+
         return dqn, env, memory
         
-        
-        def take_action(self, state):
-            pass
 
         
 
@@ -113,11 +114,10 @@ if __name__ == "__main__":
         results.append(sum(test_res.history["episode_reward"])/len(test_res.history["episode_reward"])) #Average the returns for all training episodes for this cycle
         
     # After training is done, we save the final weights.
-    agent.save_weights('agent_lstm_weights.h5f'.format("all"), overwrite=True)
+    agent.save_weights('weights_final.h5'.format("all"), overwrite=True)
     
     #And save memory
     mem_t = (memory,memory.actions,memory.rewards, memory.terminals, memory.observations)
-    #TODO: Test this
     pickle.dump(mem_t, open("training_memory.dat","wb"), protocol=-1) #Binary
     
     line, = plt.plot([1,2,3,4,5,6,7,8,9,10], results, color = (random.random(),random.random(),random.random())) #Random color
