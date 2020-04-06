@@ -6,6 +6,7 @@ import sys
 from db_controller import DBController
 from simulation import HistoricalSimulation, LiveSimulation
 from trading_agent import TradingAgent
+import yfinance as yf
 
 class postgresql_db_config:
     NAME = 'stock_data'
@@ -59,30 +60,33 @@ class TradingService():
                 self.poll_trading_sessions() #Retry
                 break
             for session in all_sessions.iterrows():
-                try:
-                    sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
-                    user = self.controller.get_user(username)
-                    user_funds = user.bank[0]
-                    user_id = user.id[0]
-                    held_shares = self.controller.get_held_shares(sid)
-                    state = self.get_state(sid, ticker, user_funds, num_trades)
-                    curr_price = state[0], state[2],
-                    action = self.take_action(state,sid)
-                    t_type = None
-                    if action == 0: #Buy
-                        self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
-                    elif action == 1: #Sell
-                        self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
-                    elif action == 3: #Sell All
-                        self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
-                    else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
-                        pass
-                                    
-                    self.controller.update_start_time(sid)
-                    self.controller.update_session_trades(sid,num_trades+1)
-                except:
-                    print("Failed to perform trade for id: "+str(sid))
-                    #TODO: Log critical failure to graylog
+                #Only perform a trade if market is open. (Or, if this is the demo historical case)
+                if(self.serv_type == "HIST" or yf.Ticker("v").info["tradeable"]):
+                    try:
+                        sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
+                        user = self.controller.get_user(username)
+                        user_funds = user.bank[0]
+                        user_id = user.id[0]
+                        held_shares = self.controller.get_held_shares(sid)
+                        state = self.get_state(sid, ticker, user_funds, num_trades)
+                        curr_price = state[0], state[2],
+                        action = self.take_action(state,sid)
+                        t_type = None
+                        if action == 0: #Buy
+                            self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
+                        elif action == 1: #Sell
+                            self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
+                        elif action == 3: #Sell All
+                            self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
+                        else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
+                            pass
+                                        
+                        self.controller.update_start_time(sid)
+                        self.controller.update_session_trades(sid,num_trades+1)
+                    except:
+                        print("Failed to perform trade for id: "+str(sid))
+                        #TODO: Log critical failure to graylog
+                        raise
                 
 
     #Agent step and take action according to learned policy

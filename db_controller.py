@@ -2,7 +2,7 @@ import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime, timedelta
-from yahoo_finance import Share
+import yfinance as yf
 
 class postgresql_db_config:
     NAME = 'stock_data'
@@ -39,9 +39,8 @@ class DBController():
     #returns the current stock price for a ticker
     def get_live_stock_price(self, ticker):
         try:
-            yahoo = Share(ticker)
-            yahoo.refresh()
-            price = yahoo.get_price() #String
+            ticker = yf.Ticker(ticker)
+            price = ticker.info["open"] #String
         except:
             print("Failed to query stock price from Yahoo")
             #TODO: Graylog
@@ -49,9 +48,19 @@ class DBController():
         return float(price)
         
     #returns the current stock price for a ticker
-    def get_live_stock_pred(self, price, ticker):
-        #TODO:
-        return float(price)
+    def get_live_stock_pred(self, ticker):
+        try:
+            #Get the most recent prediction for this stock.
+            sql = "SELECT * FROM (select ROW_NUMBER() OVER (ORDER BY time_stamp desc) AS RowNum, time_stamp, prediction from public.stock_prediction where stock_name = '"+ticker+"') as row WHERE RowNum = 1" #Not 0 indexed..
+            db = self.get_connection()
+            data = sqlio.read_sql_query(sql, db)
+        except:
+            print("Failed to query stock prediction")
+            #TODO: Graylog
+            raise
+        finally:
+            db.close()
+        return data.prediction
         
     #Returns the prediction for a ticker at a given time
     def get_stock_prediction(self, ticker, time):

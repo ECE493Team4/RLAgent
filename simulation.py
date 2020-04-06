@@ -249,8 +249,8 @@ class LiveSimulation(Simulation):
         pass
     
     #Purchase shares
-    def buy_shares(self, purch_size, user_id, user_bank, ticker, sid):
-        price = self.get_price(ticker)
+    def buy_shares(self, purch_size, user_id, user_bank, ticker, sid, num_trades):
+        price = self.get_price(ticker,num_trades)
         if(user_bank - (purch_size*price) >= 0):
             user_bank -= purch_size*price
             user_bank = round(user_bank,2)
@@ -260,7 +260,7 @@ class LiveSimulation(Simulation):
         return
         
     #Sell
-    def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid):
+    def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid,num_trades):
         price = self.get_price(ticker)
         if(held_shares >= sell_size):
             user_bank += sell_size*price
@@ -278,12 +278,12 @@ class LiveSimulation(Simulation):
       
     #Get open price of stock
     def get_price(self,ticker,time):
-        price = self.controller.get_live_stock_price(ticker,time)[0]
+        price = self.controller.get_live_stock_price(ticker)
         return round(price,2)
         
     #Query and return predicted price as trend indicator
     def get_predicted_price(self,ticker,time):
-        pred = self.controller.get_stock_prediction(ticker,time)
+        pred = self.controller.get_live_stock_pred(ticker)
         if (pred[0][0] > self.get_price(ticker,time)):
             return 1
         else:
