@@ -62,12 +62,11 @@ class TradingAgent():
         #policy = EpsGreedyQPolicy(eps=EPS_VAL) #Off policy
         policy = BoltzmannQPolicy() #Off-policy
         test_policy = MaxBoltzmannQPolicy() #On-policy
-        
+        memory = None
         if mem_file is None:
             memory = SequentialMemory(limit=50000, window_length=7) ## returns observations of len (7,)
         else:
             (memory,memory.actions,memory.rewards, memory.terminals, memory.observations) = pickle.load(open(mem_file, "rb"))
-            
         
         dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, gamma=GAMMA_VAL, nb_steps_warmup=100,policy=policy, test_policy=test_policy)
         dqn.compile("adam", metrics=['mse'])

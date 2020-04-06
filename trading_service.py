@@ -24,6 +24,7 @@ class AgentActions(Enum):
 
 class TradingService():
     
+    trader = None
     agent = None
     time = None
     sim = None
@@ -31,8 +32,8 @@ class TradingService():
     
     def __init__(self, type = "HIST"):
         self.serv_type = type
-        trader = TradingAgent(mem_file="training_memory_final.dat",w_file="weights_final.h5")
-        self.agent = trader.agent
+        self.trader = TradingAgent(mem_file="training_memory_final.dat",w_file="weights_final.h5")
+        self.agent = self.trader.agent
         if (self.serv_type == "LIVE"):
             self.sim = LiveSimulation(self.controller)
         else:
@@ -72,8 +73,15 @@ class TradingService():
 
     def take_action(self,state):
         #1. Take action using
-        #print("TRAINING? "+str(self.agent.training)) This verifies agent is ON-POLICY in production.
+        #print("TRAINING? "+str(self.agent.training)) #This verifies agent is ON-POLICY in production.
+        full_state = self.agent.memory.get_recent_state(state)
         action = self.agent.forward(state)
+        
+        # We must append recent experiences for LSTM window.
+        # Note: this only adds recent experiences for LSTM window, and not to observational/reward/terminal memory
+        # as training would do.
+        # Since this is a non-training environment the args reward and terminal are negligable
+        self.agent.memory.append(state,action,0,False)
         return action
         
     def get_state(self,sid,ticker,user_funds,num_trades):

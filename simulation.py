@@ -222,7 +222,8 @@ class HistoricalSimulation(Simulation):
     #Get observable state
     def get_state(self,sid,user_bank,ticker,time):
         held_shares = self.controller.get_held_shares(sid)
-        return (self.get_price(ticker,time),self.get_predicted_price(ticker,time), user_bank, held_shares)
+        self.state_now = np.array([self.get_price(ticker,time),self.get_predicted_price(ticker,time),user_bank, held_shares])
+        return self.state_now
       
     #Get open price of stock
     def get_price(self,ticker,time):
@@ -272,7 +273,8 @@ class LiveSimulation(Simulation):
     #Get observable state
     def get_state(self,sid,user_bank,ticker,time):
         held_shares = self.controller.get_held_shares(sid)
-        return (self.get_price(ticker,time),self.get_predicted_price(ticker,time), user_bank, held_shares)
+        self.state_now = np.array([self.get_price(ticker,time),self.get_predicted_price(ticker,time),user_bank, held_shares])
+        return self.state_now
       
     #Get open price of stock
     def get_price(self,ticker,time):

@@ -93,7 +93,7 @@ class DBController():
         sql = """UPDATE public.trading_session SET start_time = (%s) WHERE session_id = (%s)"""
         db = self.get_connection()
         cur = db.cursor()
-        next_time = (datetime.now() + timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S')
+        next_time = (datetime.now() + timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
         cur.execute(sql, (next_time,session))
         db.commit()
         cur.close()
