@@ -1,3 +1,9 @@
+import argparse
+import logging
+import os
+from logging.handlers import TimedRotatingFileHandler
+
+import graypy as graypy
 import psycopg2
 from enum import Enum
 import pandas as pd
@@ -7,6 +13,10 @@ from db_controller import DBController
 from simulation import HistoricalSimulation, LiveSimulation
 from trading_agent import TradingAgent
 import yfinance as yf
+
+
+__log__ = logging.getLogger(__name__)
+
 
 class postgresql_db_config:
     NAME = 'stock_data'
@@ -55,8 +65,7 @@ class TradingService():
             try:
                 all_sessions = self.controller.get_active_trades()
             except:
-                print("Failed to get active trading sessions")
-                #TODO: Log critical to Graylog
+                __log__.exception("failed to get active trading sessions")
                 self.poll_trading_sessions() #Retry
                 break
             for session in all_sessions.iterrows():
@@ -84,8 +93,7 @@ class TradingService():
                         self.controller.update_start_time(sid)
                         self.controller.update_session_trades(sid,num_trades+1)
                     except:
-                        print("Failed to perform trade for id: "+str(sid))
-                        #TODO: Log critical failure to graylog
+                        __log__.exception(f"failed to perform trade for id: {sid}")
                         raise
                 
 
@@ -119,11 +127,107 @@ class TradingService():
         return self.sim.get_state(sid,user_funds,ticker,num_trades)
         
 
+LOG_LEVEL_STRINGS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
+
+
+def log_level(log_level_string: str):
+    """Argparse type function for determining the specified logging level"""
+    if log_level_string not in LOG_LEVEL_STRINGS:
+        raise argparse.ArgumentTypeError(
+            "invalid choice: {} (choose from {})".format(
+                log_level_string, LOG_LEVEL_STRINGS
+            )
+        )
+    return getattr(logging, log_level_string, logging.INFO)
+
+
+def add_log_parser(parser):
+    """Add logging options to the argument parser"""
+    group = parser.add_argument_group(title="Logging")
+    group.add_argument(
+        "--log-level",
+        dest="log_level",
+        default="INFO",
+        type=log_level,
+        help="Set the logging output level",
+    )
+    group.add_argument(
+        "--log-dir",
+        dest="log_dir",
+        help="Enable TimeRotatingLogging at the directory " "specified",
+    )
+    group.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging"
+    )
+    group.add_argument(
+        "--graylog-address",
+        dest="graylog_address",
+        help="Enable graylog for TCP log forwarding at the IP address specified.",
+    )
+    group.add_argument(
+        "--graylog-port",
+        dest="graylog_port",
+        default=12201,
+        help="Port for graylog TCP log forwarding.",
+    )
+
+
+def init_logging(args, log_file_path):
+    """Intake a argparse.parse_args() object and setup python logging"""
+    # configure logging
+    handlers_ = []
+    log_format = logging.Formatter(fmt="[%(asctime)s] [%(levelname)s] - %(message)s")
+    if args.log_dir:
+        os.makedirs(args.log_dir, exist_ok=True)
+        file_handler = TimedRotatingFileHandler(
+            os.path.join(args.log_dir, log_file_path),
+            when="d",
+            interval=1,
+            backupCount=7,
+            encoding="UTF-8",
+        )
+        file_handler.setFormatter(log_format)
+        file_handler.setLevel(args.log_level)
+        handlers_.append(file_handler)
+    if args.verbose:
+        stream_handler = logging.StreamHandler(stream=sys.stderr)
+        stream_handler.setFormatter(log_format)
+        stream_handler.setLevel(args.log_level)
+        handlers_.append(stream_handler)
+
+    if args.graylog_address:
+        graylog_handler = graypy.GELFTCPHandler(args.graylog_address, args.graylog_port)
+        handlers_.append(graylog_handler)
+
+    logging.basicConfig(handlers=handlers_, level=args.log_level)
+
+
+def get_parser() -> argparse.ArgumentParser:
+    """Create and return the argparser for the RLAgent trading service"""
+    parser = argparse.ArgumentParser(
+        description="Start the RLAgent trading service",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    parser.add_argument(
+        dest="server_type",
+        default="HIST",
+        choices=["LIVE", "HIST"],
+        help="Server type of RLAgent",
+    )
+
+    add_log_parser(parser)
+
+    return parser
+
+
+def main(argv=sys.argv[1:]) -> int:
+    parser = get_parser()
+    args = parser.parse_args(argv)
+    init_logging(args, "RLAgent.log")
+    __log__.info(f"launching rl agent for: {args.server_type} config")
+    serv = TradingService(args.server_type)
+
+
 if __name__ == "__main__":
-    args = sys.argv
-    if(len(args) > 1):
-        serv_type = args[1]
-    else:
-        serv_type = "HIST"
-    print("Launching rl agent for: "+serv_type+" config")
-    serv = TradingService(serv_type)
+   main()
