@@ -15,6 +15,9 @@ from trading_agent import TradingAgent
 import yfinance as yf
 
 
+__log__ = logging.getLogger(__name__)
+
+
 class postgresql_db_config:
     NAME = 'stock_data'
     PORT = 5432
@@ -62,8 +65,7 @@ class TradingService():
             try:
                 all_sessions = self.controller.get_active_trades()
             except:
-                print("Failed to get active trading sessions")
-                #TODO: Log critical to Graylog
+                __log__.exception("failed to get active trading sessions")
                 self.poll_trading_sessions() #Retry
                 break
             for session in all_sessions.iterrows():
@@ -91,8 +93,7 @@ class TradingService():
                         self.controller.update_start_time(sid)
                         self.controller.update_session_trades(sid,num_trades+1)
                     except:
-                        print("Failed to perform trade for id: "+str(sid))
-                        #TODO: Log critical failure to graylog
+                        __log__.exception(f"failed to perform trade for id: {sid}")
                         raise
                 
 
