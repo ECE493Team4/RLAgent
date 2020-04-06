@@ -2,7 +2,7 @@ import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime, timedelta
-import yfinance as yf
+from yahooquery import Ticker
 
 class postgresql_db_config:
     NAME = 'stock_data'
@@ -39,8 +39,8 @@ class DBController():
     #returns the current stock price for a ticker
     def get_live_stock_price(self, ticker):
         try:
-            ticker = yf.Ticker(ticker)
-            price = ticker.info["open"] #String
+            tick = Ticker(ticker)
+            price = tick.price[ticker]["regularMarketPrice"]
         except:
             print("Failed to query stock price from Yahoo")
             #TODO: Graylog
