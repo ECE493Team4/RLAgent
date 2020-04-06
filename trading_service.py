@@ -28,6 +28,10 @@ class TradingService():
     agent = None
     time = None
     sim = None
+    
+    #Keep track of observations for each session.
+    recent_obs = {}
+    
     controller = DBController()
     
     def __init__(self, type = "HIST"):
@@ -47,33 +51,49 @@ class TradingService():
             #2. Take action
             #3. Set trade status/user data
             #4. Busy-wait
-            all_sessions = self.controller.get_active_trades()
+            try:
+                all_sessions = self.controller.get_active_trades()
+            except:
+                print("Failed to get active trading sessions")
+                #TODO: Log critical to Graylog
+                self.poll_trading_sessions() #Retry
+                break
             for session in all_sessions.iterrows():
-                sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
-                user = self.controller.get_user(username)
-                user_funds = user.bank[0]
-                user_id = user.id[0]
-                held_shares = self.controller.get_held_shares(sid)
-                state = self.get_state(sid, ticker, user_funds, num_trades)
-                curr_price = state[0], state[2],
-                action = self.take_action(state)
-                t_type = None
-                if action == 0:
-                    self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
-                elif action == 1:
-                    self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
-                elif action == 3:
-                    self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
-                else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
-                    pass
-                                
-                self.controller.update_start_time(sid)
-                self.controller.update_session_trades(sid,num_trades+1)
-                #2. Log action to graylog, DB
+                try:
+                    sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
+                    user = self.controller.get_user(username)
+                    user_funds = user.bank[0]
+                    user_id = user.id[0]
+                    held_shares = self.controller.get_held_shares(sid)
+                    state = self.get_state(sid, ticker, user_funds, num_trades)
+                    curr_price = state[0], state[2],
+                    action = self.take_action(state,sid)
+                    t_type = None
+                    if action == 0: #Buy
+                        self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
+                    elif action == 1: #Sell
+                        self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
+                    elif action == 3: #Sell All
+                        self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
+                    else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
+                        pass
+                                    
+                    self.controller.update_start_time(sid)
+                    self.controller.update_session_trades(sid,num_trades+1)
+                except:
+                    print("Failed to perform trade for id: "+str(sid))
+                    #TODO: Log critical failure to graylog
+                
 
-    def take_action(self,state):
+    #Agent step and take action according to learned policy
+    def take_action(self,state,sid):
         #1. Take action using
         #print("TRAINING? "+str(self.agent.training)) #This verifies agent is ON-POLICY in production.
+        
+        #Swap observations to this sessions past experiences
+        if sid in self.recent_obs:
+            self.agent.memory.recent_observations = self.recent_obs[sid]
+        
         full_state = self.agent.memory.get_recent_state(state)
         action = self.agent.forward(state)
         
@@ -82,6 +102,10 @@ class TradingService():
         # as training would do.
         # Since this is a non-training environment the args reward and terminal are negligable
         self.agent.memory.append(state,action,0,False)
+        
+        #Store recent observations
+        self.recent_obs[sid] = self.agent.memory.recent_observations
+        
         return action
         
     def get_state(self,sid,ticker,user_funds,num_trades):
