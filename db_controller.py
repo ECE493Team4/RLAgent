@@ -180,7 +180,7 @@ class DBController():
     def get_user(self,name):
         try:
             #1. SQL query for user data
-            sql ="select * from public.user where username = '"+name+"'"
+            sql = "select * from public.user where username = '"+name+"'"
             db = self.get_connection()
             data = sqlio.read_sql_query(sql, db)
         except:
