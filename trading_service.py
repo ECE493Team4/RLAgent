@@ -203,7 +203,7 @@ def init_logging(args, log_file_path):
 
 
 def get_parser() -> argparse.ArgumentParser:
-    """Create and return the argparser for the trading service"""
+    """Create and return the argparser for the RLAgent trading service"""
     parser = argparse.ArgumentParser(
         description="Start the RLAgent trading service",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
