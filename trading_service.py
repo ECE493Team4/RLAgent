@@ -225,7 +225,7 @@ def main(argv=sys.argv[1:]) -> int:
     parser = get_parser()
     args = parser.parse_args(argv)
     init_logging(args, "RLAgent.log")
-    print("Launching rl agent for: " + args.server_type + " config")
+    __log__.info(f"launching rl agent for: {args.server_type} config")
     serv = TradingService(args.server_type)
 
 
