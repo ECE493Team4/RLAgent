@@ -140,13 +140,16 @@ class DBController():
             db.close()
         return
         
-    def update_start_time(self, session):
+    def update_start_time(self, session, type):
         try:
             sql = """UPDATE public.trading_session SET start_time = (%s) WHERE session_id = (%s)"""
             db = self.get_connection()
             cur = db.cursor()
-            #TODO: Change this to an hour
-            next_time = (datetime.now() + timedelta(seconds=20)).strftime('%Y-%m-%d %H:%M:%S')
+            if(type == "LIVE"):
+                next_time = (datetime.now() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                next_time = (datetime.now() + timedelta(seconds=20)).strftime('%Y-%m-%d %H:%M:%S')
+                
             cur.execute(sql, (next_time,session))
             db.commit()
         except:

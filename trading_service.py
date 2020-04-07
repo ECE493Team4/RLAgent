@@ -91,7 +91,7 @@ class TradingService():
                             self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid,num_trades)
                         else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
                             pass
-                        self.controller.update_start_time(sid)
+                        self.controller.update_start_time(sid,self.serv_type)
                         self.controller.update_session_trades(sid,num_trades+1)
                     except:
                         __log__.exception(f"failed to perform trade for id: {sid}")
