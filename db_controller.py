@@ -128,7 +128,7 @@ class DBController():
             db = self.get_connection()
             cur = db.cursor()
             #Format date, no time-zone.
-            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             cur.execute(sql, (price,trade_type,volume,time,session))
             db.commit()
         except:
@@ -199,7 +199,7 @@ class DBController():
     #These are trades that are ready to be processed.
     def get_active_trades(self):
         try:
-            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             sql = "select * from public.trading_session WHERE is_paused = False AND is_finished = False AND start_time < '"+str(time)+"'"
             db = self.get_connection()
             data = sqlio.read_sql_query(sql, db)
