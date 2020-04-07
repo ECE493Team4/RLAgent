@@ -12,8 +12,7 @@ import sys
 from db_controller import DBController
 from simulation import HistoricalSimulation, LiveSimulation
 from trading_agent import TradingAgent
-import yfinance as yf
-
+import datetime
 
 __log__ = logging.getLogger(__name__)
 
@@ -62,6 +61,9 @@ class TradingService():
             #2. Take action
             #3. Set trade status/user data
             #4. Busy-wait
+            ny_time = datetime.datetime.utcnow() + datetime.timedelta(hours=-4)
+            ny_hour = ny_time.hour
+            ny_min = ny_time.minute
             try:
                 all_sessions = self.controller.get_active_trades()
             except:
@@ -70,7 +72,7 @@ class TradingService():
                 break
             for session in all_sessions.iterrows():
                 #Only perform a trade if market is open. (Or, if this is the demo historical case)
-                if(self.serv_type == "HIST" or yf.Ticker("v").info["tradeable"]):
+                if(self.serv_type == "HIST" or ((ny_hour >= 10 or (ny_hour >= 9 and ny_min >= 30)) and ny_hour < 16)):
                     try:
                         sid, username, ticker, num_trades = (session[1].session_id, session[1].username, session[1].ticker, session[1].num_trades)
                         user = self.controller.get_user(username)
@@ -81,7 +83,6 @@ class TradingService():
                         curr_price = state[0], state[2],
                         action = self.take_action(state,sid)
                         t_type = None
-                        action = 3
                         if action == 0: #Buy
                             self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
                         elif action == 1: #Sell
