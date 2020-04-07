@@ -146,9 +146,9 @@ class DBController():
             db = self.get_connection()
             cur = db.cursor()
             if(type == "LIVE"):
-                next_time = (datetime.now() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+                next_time = (datetime.utcnow() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
             else:
-                next_time = (datetime.now() + timedelta(seconds=20)).strftime('%Y-%m-%d %H:%M:%S')
+                next_time = (datetime.utcnow() + timedelta(seconds=20)).strftime('%Y-%m-%d %H:%M:%S')
                 
             cur.execute(sql, (next_time,session))
             db.commit()
