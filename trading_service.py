@@ -81,20 +81,20 @@ class TradingService():
                         curr_price = state[0], state[2],
                         action = self.take_action(state,sid)
                         t_type = None
+                        action = 3
                         if action == 0: #Buy
                             self.sim.buy_shares(1,user_id,user_funds,ticker,sid,num_trades)
                         elif action == 1: #Sell
                             self.sim.sell_shares(1,held_shares,user_id,user_funds,ticker,sid,num_trades)
                         elif action == 3: #Sell All
-                            self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid)
+                            self.sim.sell_all(held_shares,user_id,user_funds,ticker,sid,num_trades)
                         else: #Action 2, Do nothing. This isn't recorded as it is not a Trade.
                             pass
-                                        
                         self.controller.update_start_time(sid)
                         self.controller.update_session_trades(sid,num_trades+1)
                     except:
                         __log__.exception(f"failed to perform trade for id: {sid}")
-                        raise
+                        #raise
                 
 
     #Agent step and take action according to learned policy

@@ -211,8 +211,8 @@ class HistoricalSimulation(Simulation):
             return
         return
         
-    def sell_all(self,held_shares,user_id,user_bank,ticker,sid):
-        price = self.get_price(ticker)
+    def sell_all(self,held_shares,user_id,user_bank,ticker,sid,num_trades):
+        price = self.get_price(ticker,num_trades)
         user_bank += held_shares*price
         user_bank = round(user_bank,2)
         self.controller.add_session_trade(price, "SELL", held_shares, sid)
@@ -261,13 +261,21 @@ class LiveSimulation(Simulation):
         
     #Sell
     def sell_shares(self,sell_size,held_shares,user_id,user_bank,ticker,sid,num_trades):
-        price = self.get_price(ticker)
+        price = self.get_price(ticker,num_trades)
         if(held_shares >= sell_size):
             user_bank += sell_size*price
             user_bank = round(user_bank,2)
             self.controller.add_session_trade(price, "SELL", sell_size, sid)
             self.controller.update_user_funds(user_id, user_bank)
             return
+        return
+        
+    def sell_all(self,held_shares,user_id,user_bank,ticker,sid,num_trades):
+        price = self.get_price(ticker,None) #time is irrelevant in this case
+        user_bank += held_shares*price
+        user_bank = round(user_bank,2)
+        self.controller.add_session_trade(price, "SELL", held_shares, sid)
+        self.controller.update_user_funds(user_id, user_bank)
         return
       
     #Get observable state
