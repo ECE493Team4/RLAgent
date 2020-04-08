@@ -70,6 +70,7 @@ class TradingService():
         self.poll_trading_sessions()
 
     def poll_trading_sessions(self):
+        print("Successfully launched service, begin poll of trading sessions.")
         while(1):
             #1. Query sessions to be traded
             #2. Take action
