@@ -1,10 +1,15 @@
 import unittest
 from db_controller import DBController
+from simulation import TrainingSimulation, LiveSimulation, HistoricalSimulation
 from yahooquery import Ticker
+import pandas as pd
+
 #Database keys to data objects dedicated for testing
 TEST_USER_ID = 0
 TEST_SESSION_ID = 1
 TEST_NAME = "test_acc"
+TEST_DATA = "test_data.txt"
+TEST_PRED = "test_pred.csv"
 TEST_STOCK_IDX = 0
 stocks = ["v","msft","dis","aapl","intc","ge","ibm","jpm","nke","wmt"]
 
@@ -143,6 +148,133 @@ class TestDBController(unittest.TestCase):
     def test_get_active_trades(self):
         pass
 
+class TestTrainingSimulation(unittest.TestCase):
+    
+    #Pre-test simulation init for each test
+    def setUp(self):
+        data = pd.read_csv(TEST_DATA)
+        pred = pd.read_csv(TEST_PRED)
+        self.sim = TrainingSimulation(data,"test_ticker",pred)
+    
+    #Test that variables for training are initialized properly
+    def test_init(self):
+        print("testing training simulation init.")
+        funds = self.sim.funds
+        held_shares = self.sim.held_shares
+        shares = self.sim.shares
+        pred_data = self.sim.stocks_pred
+        stock_data = self.sim.stocks_open
+        self.assertTrue(funds == 5000)
+        self.assertTrue(held_shares == 0)
+        self.assertTrue(len(shares) == 0)
+        self.assertTrue(len(pred_data) > 0)
+        self.assertTrue(len(stock_data) > 0)
+        print("Success")
+
+    #Test that the environment steps as expected
+    def test_step(self):
+        print("testing training simulation step.")
+        pre_index = self.sim.index
+        self.sim.step()
+        self.assertTrue(pre_index+1==self.sim.index)
+        print("Success")
+        
+    #Test buy shares reward function.
+    def test_buy_reward(self):
+        print("testing training sim reward for regular buy")
+        pre_funds = self.sim.funds
+        reward = self.sim.buy_shares(1)
+        self.assertTrue(reward == 0) #0 reward for regular purchase
+        self.assertTrue(pre_funds > self.sim.funds)
+        self.assertTrue(len(self.sim.shares) == 1)
+        print("Success")
+        
+        print("testing training sim reward for buy W/ no money.")
+        self.sim.funds = 0
+        reward = self.sim.buy_shares(1)
+        self.assertTrue(reward == -1000) #0 reward for regular purchase
+        print("Success")
+    
+    #Test sell shares reward function.
+    def test_sell_reward(self):
+        print("testing training sim reward for sell W/ no shares.")
+        reward = self.sim.sell_shares(1)
+        self.assertTrue(reward == -1000) #0 reward for regular purchase
+        print("Success")
+    
+        print("testing training sim reward for regular sell")
+        pre_funds = self.sim.funds
+        reward = self.sim.buy_shares(1)
+        self.assertTrue(reward == 0) #0 reward for regular purchase
+        self.assertTrue(len(self.sim.shares) == 1)
+        self.assertTrue(pre_funds > self.sim.funds)
+        reward = self.sim.sell_shares(1)
+        self.assertTrue(reward == 0) #Sell reward will calculate to be 0.. since no step (ROI = 0).
+        self.assertTrue(len(self.sim.shares) == 0)
+        self.assertTrue(pre_funds == self.sim.funds) #No step, therefore price should be same for buy/sell!
+        print("Success")
+        
+    #Test sell all reward function.
+    def test_sell_reward(self):
+        print("testing training sim reward for regular big sell")
+        pre_funds = self.sim.funds
+        reward = self.sim.buy_shares(2)
+        self.assertTrue(reward == 0) #0 reward for regular purchase
+        self.assertTrue(len(self.sim.shares) == 2)
+        self.assertTrue(pre_funds > self.sim.funds)
+        reward = self.sim.sell_all()
+        self.assertTrue(reward == 0) #Sell reward will calculate to be 0.. since no step (ROI = 0).
+        self.assertTrue(len(self.sim.shares) == 0)
+        self.assertTrue(pre_funds == self.sim.funds) #No step, therefore price should be same for buy/sell!
+        print("Success")
+        
+    #Test sell all reward function.
+    def test_get_state(self):
+        print("testing get state")
+        state = self.sim.get_state()
+        price = state[0]
+        pred = state[1]
+        funds = state[2]
+        shares = state[3]
+        self.assertTrue(isinstance(price,float))
+        self.assertTrue(isinstance(pred,float))
+        self.assertTrue(isinstance(funds,float))
+        self.assertTrue(isinstance(shares,float))
+        self.assertTrue(price == self.sim.get_price())
+        self.assertTrue(pred == self.sim.get_predicted_price())
+        self.assertTrue(funds == self.sim.funds)
+        self.assertTrue(shares == self.sim.held_shares)
+        print("Success")
+        
+    #Test sell all reward function.
+    def test_get_price(self):
+        print("testing get price")
+        price = self.sim.get_price()
+        self.assertTrue(price == self.sim.stocks_open[self.sim.index])
+        self.assertTrue(isinstance(price,float))
+        print("Success")
+        
+    #Test sell all reward function.
+    def test_get_pred_price(self):
+        print("testing get predicted price")
+        pred = self.sim.get_predicted_price()
+        self.assertTrue(pred == 0 or pred == 1)
+        print("Success")
+        
+    #Test sim reset.
+    def test_reset(self):
+        print("testing sim reset")
+        funds = self.sim.funds
+        held_shares = self.sim.held_shares
+        shares = self.sim.shares
+        pred_data = self.sim.stocks_pred
+        stock_data = self.sim.stocks_open
+        self.assertTrue(funds == 5000)
+        self.assertTrue(held_shares == 0)
+        self.assertTrue(len(shares) == 0)
+        self.assertTrue(len(pred_data) > 0)
+        self.assertTrue(len(stock_data) > 0)
+        print("Success")
 
 #Do testing
 if __name__ == "__main__":

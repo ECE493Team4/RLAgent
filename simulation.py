@@ -135,8 +135,9 @@ class TrainingSimulation(Simulation):
         return self.state_now
     
     def get_price(self):
-        return self.stocks_open[self.index]
-        
+        return float(self.stocks_open[self.index])
+    
+    #Unused but we keep this to demonstrate how predictions were simulated.
     #For simulated ML Predictions
     #def get_predicted_price(self):
     #    if(self.index+1 >= len(self.stocks_open)):
