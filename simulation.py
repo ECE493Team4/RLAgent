@@ -245,7 +245,7 @@ class LiveSimulation(Simulation):
     def __init__(self,controller):
         self.controller = controller
         
-    #Advance 1 data point (Day/hr/min)
+    #Unused
     def step(self):
         pass
     

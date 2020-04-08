@@ -154,6 +154,88 @@ class TestDBController(unittest.TestCase):
             self.assertTrue(not sess[1].is_paused)
         print("Success")
         
+    #Statement coverage of get_price
+    def test_failure_get_price(self):
+        print("Testing failure of get_price")
+        try:
+            price = self.db.get_stock_price("v",-1)[0] #Broken stock idx
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+            
+    #Statement coverage of get_live_price
+    def test_failure_get_live_price(self):
+        print("Testing failure of get_live_price")
+        try:
+            price = self.db.get_stock_price(999)[0] #Broken stock ticker val
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+    
+    #Statement coverage of get_live_pred
+    def test_failure_get_live_pred(self):
+        print("Testing failure of get_live_price")
+        try:
+            pred = self.db.get_live_stock_pred(999)[0] #Broken stock ticker val
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+    
+    #Statement coverage of get_pricediction
+    def test_failure_get_pred(self):
+        print("Testing failure of get pred")
+        try:
+            pred = self.db.get_stock_prediction(999,999)[0] #Broken stock ticker val
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+            
+    #Statement coverage of update funds
+    def test_failure_update_funds(self):
+        print("Testing failure of update funds")
+        try:
+            self.db.update_user_funds(-1,999) #Broken user_id
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+            
+    #Statement coverage of add_trade
+    def test_failure_add_trade(self):
+        print("Testing failure of add trade")
+        try:
+            self.db.add_session_trade(-1,"",-1,-1)[0] #Broken inputs
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+            
+    #Statement coverage of update time
+    def test_failure_update_time(self):
+        print("Testing failure of update time")
+        try:
+            self.db.update_start_time(-1,"") #Broken inputs
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+    
+    #Statement coverage of update trades
+    def test_failure_update_trades(self):
+        print("Testing failure of update time")
+        try:
+            self.db.update_start_time(-1,-1) #Broken inputs
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+            
+    #Statement coverage of get_user
+    def test_failure_get_user(self):
+        print("Testing failure of get user")
+        try:
+            self.db.get_user(-1) #Broken inputs
+            self.assertTrue(False) #Shouldnt get here
+        except:
+            print("Success")
+        
+        
         
 class TestSimulationRewardFunction(unittest.TestCase):
 
@@ -400,10 +482,11 @@ class TestHistoricalSimulation(unittest.TestCase):
         
     #Test get price
     def test_get_price(self):
-        print("testing historical get price")
-        price = self.sim.get_price("v",self.TEST_TICKER_IDX)
-        self.assertTrue(isinstance(price,float))
-        self.assertTrue(price > 0)
+        print("testing historical get price for all stocks")
+        for tick in stocks:
+            price = self.sim.get_price(tick,self.TEST_TICKER_IDX)
+            self.assertTrue(isinstance(price,float))
+            self.assertTrue(price > 0)
         print("Success")
         
     #Test get pred, statement coverage of pred is obtained here.
@@ -418,6 +501,117 @@ class TestHistoricalSimulation(unittest.TestCase):
         self.assertTrue(isinstance(pred2,int))
         self.assertTrue(pred2 == 0)
         print("Success")
+
+
+    #Historical sim steps through old data for demo purposes and interacts with the application DB
+class TestLiveSimulation(unittest.TestCase):
+        
+        TEST_TICKER_IDX = 0 #Doesnt matter here, but we need the input regardless
+                
+        #Pre-test simulation init for each test
+        def setUp(self):
+            data = pd.read_csv(TEST_DATA)
+            pred = pd.read_csv(TEST_PRED)
+            self.db = DBController()
+            self.sim = LiveSimulation(self.db)
+        
+        #Test that variables for training are initialized properly
+        def test_init(self):
+            print("testing live simulation init.")
+            controller = self.sim.controller
+            self.assertTrue(isinstance(controller, DBController))
+            print("Success")
+            
+        #Test buy shares reward function.
+        def test_buy_stocks(self):
+            print("testing historical sim for regular buy")
+            pre_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(5000.0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            user_funds = self.db.get_user(TEST_NAME).bank[0]
+            self.assertTrue(pre_share_num+1 == post_share_num)
+            self.assertTrue(user_funds < 5000)
+            print("Success")
+            
+            print("testing historical sim for regular buy W/ no money.")
+            pre_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            user_funds = self.db.get_user(TEST_NAME).bank[0]
+            self.assertTrue(pre_share_num == post_share_num)
+            print("Success")
+            
+        #Test sell shares reward function.
+        def test_sell_stocks(self):
+            print("testing historical sim for regular sell")
+            pre_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            user_funds_before = self.db.get_user(TEST_NAME).bank[0]
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(user_funds_before), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            user_funds_buy = self.db.get_user(TEST_NAME).bank[0]
+            self.sim.sell_shares(1,1,np.float32(TEST_USER_ID), np.float32(user_funds_buy), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            user_funds_after = self.db.get_user(TEST_NAME).bank[0]
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.assertTrue(pre_share_num == post_share_num) #buy then sell, no change in vol. Buy is already proven to add +1
+            self.assertTrue(user_funds_after == user_funds_before)
+            print("Success")
+            
+            print("testing historical sim for regular sell W/ no shares.")
+            pre_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.sim.sell_shares(1,0,np.float32(TEST_USER_ID), np.float32(5000.0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX) #aapl test stock has no purchases made ever for test session.
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.assertTrue(pre_share_num == post_share_num)
+            print("Success")
+        
+        #Test sell shares reward function.
+        def test_sell_all_stocks(self):
+            print("testing historical sim for regular sell all")
+            pre_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(5000.0  ), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(5000.0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            self.sim.buy_shares(1, np.float32(TEST_USER_ID), np.float32(5000.0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.assertTrue(pre_share_num+3 == post_share_num) #buy then sell, no change in vol. Buy is already proven to add +1
+            self.sim.sell_all(3, np.float32(TEST_USER_ID), np.float32(5000.0), "v", TEST_SESSION_ID, self.TEST_TICKER_IDX)
+            post_share_num = self.db.get_held_shares(TEST_SESSION_ID)
+            self.assertTrue(post_share_num == pre_share_num)
+            print("Success")
+            
+        #Test the state used as input for the RL Agent
+        def test_get_state(self):
+            print("testing historical get state")
+            state = self.sim.get_state(TEST_SESSION_ID,self.db.get_user(TEST_NAME).bank[0],"v",self.TEST_TICKER_IDX)
+            price = state[0]
+            pred = state[1]
+            funds = state[2]
+            shares = state[3]
+            self.assertTrue(isinstance(price,float))
+            self.assertTrue(isinstance(pred,float))
+            self.assertTrue(isinstance(funds,float))
+            self.assertTrue(isinstance(shares,float))
+            self.assertTrue(abs(price - self.sim.get_price("v",self.TEST_TICKER_IDX)) <= 0.50) #Could fluctuate in live
+            self.assertTrue(pred == self.sim.get_predicted_price("v",self.TEST_TICKER_IDX))
+            self.assertTrue(funds == self.db.get_user(TEST_NAME).bank[0])
+            self.assertTrue(shares == self.db.get_held_shares(TEST_SESSION_ID))
+            print("Success")
+            
+        #Test get price
+        def test_get_price(self):
+            print("testing historical get price for all stocks")
+            for tick in stocks:
+                price = self.sim.get_price(tick,self.TEST_TICKER_IDX)
+                ticker = Ticker(tick)
+                cur_price = ticker.price[tick]["regularMarketPrice"]
+                self.assertTrue(abs(price - cur_price) <= 0.50) #Could fluctuate in live
+                self.assertTrue(isinstance(price,float))
+                self.assertTrue(price > 0)
+            print("Success")
+            
+        #Test get pred, statement coverage of pred is obtained here.
+        def test_get_pred_price(self):
+            print("testing historical get pred price")
+            pred = self.sim.get_predicted_price("v",self.TEST_TICKER_IDX)
+            self.assertTrue(isinstance(pred,int))
+            self.assertTrue(pred == 1 or pred == 0) #In live we cant guarantee statement coverage in our testing since it is dependent on our ML output. And at any given time we cannot have Both a trend up and a trend down.
 
 
     

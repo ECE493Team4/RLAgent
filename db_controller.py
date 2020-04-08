@@ -30,7 +30,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("Failed to query stock price from Datasource")
-            #TODO: Graylog
             raise
         finally:
             db.close()
@@ -43,7 +42,6 @@ class DBController():
             price = tick.price[ticker]["regularMarketPrice"]
         except:
             print("Failed to query stock price from Yahoo")
-            #TODO: Graylog
             raise
         return float(price)
         
@@ -56,7 +54,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("Failed to query stock prediction")
-            #TODO: Graylog
             raise
         finally:
             db.close()
@@ -71,7 +68,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("Failed to query stock prediction")
-            #TODO: Graylog
             raise
         finally:
             db.close()
@@ -86,7 +82,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("failed to query held_stocks for sid: "+str(sid))
-            #TODO: Graylog
             raise
         finally:
             db.close()
@@ -114,7 +109,6 @@ class DBController():
             db.commit()
         except:
             print("Failed to update user funds for: "+str(uuid))
-            #TODO: Graylog
             raise
         finally:
             cur.close()
@@ -133,7 +127,6 @@ class DBController():
             db.commit()
         except:
             print("failed to add trade to session: "+str(session))
-            #TODO: Graylog
             raise
         finally:
             cur.close()
@@ -154,7 +147,6 @@ class DBController():
             db.commit()
         except:
             print("Failed to update start time for sid: "+str(session))
-            #TODO: Graylog
             raise
         finally:
             cur.close()
@@ -173,7 +165,6 @@ class DBController():
             db.commit()
         except:
             print("Failed to update trade count for: "+str(sid))
-            #TODO: Graylog
             raise
         finally:
             cur.close()
@@ -189,7 +180,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("Failed to get user: "+name)
-            #TODO: Graylog
             raise
         finally:
             db.close()
@@ -205,7 +195,6 @@ class DBController():
             data = sqlio.read_sql_query(sql, db)
         except:
             print("Failed to get active trades")
-            #TODO: Graylog
             raise
         finally:
             db.close()
