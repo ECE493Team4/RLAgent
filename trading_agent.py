@@ -26,6 +26,14 @@ except:
    import pickle
 
 
+#This module provides an interface to build the trading agent using specified weights and memory, OR to train the agent and output stats.
+#To train the agent: Run this file as: python3 trading_agent.py, otherwise the TradingAgent class with provide the necessary methods.
+# REQUIREMENTS:
+# SRS4.6.3.1 - The Agent will be trained to best ensure maximum profit (The process of training with the described reward achieves this)
+# SRS4.6.3.2 - The Agent is bound to perform a Buy, Sell or Hold action.
+# SRS4.6.3.4 - A virutal wallet will be used to simulate user funds
+# SRS4.6.3.6 - The agent will take the input: ML Output, Stock price, Held stocks, User Funds (NOTE: Held_stocks and funds were not marked in the SRS however were a TODO as design proceeded)
+
 Datafiles = ["aapl.us.txt","dis.us.txt","ge.us.txt","ibm.us.txt","intc.us.txt","jpm.us.txt","msft.us.txt","nke.us.txt","v.us.txt","wmt.us.txt"]
 ValidatorFiles = ["dis.us.txt","aapl.us.txt","ibm.us.txt","nke.us.txt","v.us.txt","jpm.us.txt","msft.us.txt","wmt.us.txt","intc.us.txt","ge.us.txt",]
 

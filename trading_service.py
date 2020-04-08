@@ -14,6 +14,20 @@ from simulation import HistoricalSimulation, LiveSimulation
 from trading_agent import TradingAgent
 import datetime
 
+#This module provides an interface to build the run a permanent TradingService, which iterates through active sessions and takes actions where necessary.
+#To train the agent: Run this file as: python3 trading_agent.py, otherwise the TradingAgent class with provide the necessary methods.
+# REQUIREMENTS:
+# SRS4.6.3.1 - The Agent will be trained to best ensure maximum profit (The process of training with the described reward achieves this)
+# SRS4.6.3.2 - The Agent is bound to perform a Buy, Sell or Hold action.
+# SRS4.6.3.3 - The Agent will take action for a session each hour (Database start_time determines this, and is updated to be an hour past the current time)
+# SRS4.6.3.4 - A virutal wallet will be used to simulate user funds
+# SRS4.6.3.5 - The Agent will trade in the background - this process is separate to the web app.
+# SRS4.6.3.6 - The agent will take the input: ML Output, Stock price, Held stocks, User Funds (NOTE: Held_stocks and funds were not marked in the SRS however were a TODO as design proceeded)
+
+#Security Requirement #7: RL Service is not exposed to the web, and runs as its own system process.
+
+
+
 __log__ = logging.getLogger(__name__)
 
 

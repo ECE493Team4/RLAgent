@@ -23,7 +23,11 @@ from rl.agents import SARSAAgent, DQNAgent
 from rl.policy import MaxBoltzmannQPolicy,BoltzmannQPolicy
 from rl.memory import SequentialMemory, EpisodeParameterMemory
 
-
+# This code module provides an environment for the Training of the Reinforcement Learning Agent using OpenAI Gym.
+# SRS4.6.3.1 - The Agent will be trained to best ensure maximum profit (The process of training with the described reward achieves this)
+# SRS4.6.3.2 - The Agent is bound to perform a Buy, Sell or Hold action.
+# SRS4.6.3.4 - A virutal wallet will be used to simulate user funds
+# SRS4.6.3.6 - The agent will take the input: ML Output, Stock price, Held stocks, User Funds (NOTE: Held_stocks and funds were not marked in the SRS however were a TODO as design proceeded)
 
 class AgentActions(Enum):
     Buy = 0
@@ -61,7 +65,6 @@ class TradingEnv(gym.Env):
         ])
         
         self.action_space = spaces.Discrete(4)
-        #self.action_space = spaces.Box(np.array([0,0]), np.array([10,10]), dtype=np.float32) #Max 10 buys, 10 sells.
         self.observation_space = spaces.Box(obs_domain_lower, obs_domain_upper, dtype=np.float32)
         
         self.seed()

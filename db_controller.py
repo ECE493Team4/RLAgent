@@ -1,8 +1,18 @@
+
 import psycopg2
 import pandas as pd
 import pandas.io.sql as sqlio
 from datetime import datetime, timedelta
 from yahooquery import Ticker
+
+# This class module provides a database interface to
+# the RL Service, which facilitates trades in our application.
+# REQUIREMENTS:
+# SRS4.2.3.1 - Live Data Collection
+# SRS4.2.3.3 - Live Data not saved
+# SRS4.2.3.4 - Failures result in logging (Logging is caught within the service, but the error is thrown here)
+# SRS4.6.3.3 - The Agent will take action for a session each hour (Database start_time determines this, and is updated to be an hour past the current time)
+
 
 class postgresql_db_config:
     NAME = 'stock_data'

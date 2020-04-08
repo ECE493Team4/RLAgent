@@ -14,6 +14,15 @@ import gym
 import numpy as np
 
 
+#This module provides a simulation for the trading agent to interface each environment: Live, Training and Historical.
+#To train the agent: Run this file as: python3 trading_agent.py, otherwise the TradingAgent class with provide the necessary methods.
+# REQUIREMENTS:
+# SRS4.6.3.2 - The Agent is bound to perform a Buy, Sell or Hold action.
+# SRS4.6.3.4 - A virutal wallet will be used to simulate user funds
+# SRS4.6.3.6 - The agent will take the input: ML Output, Stock price, Held stocks, User Funds (NOTE: Held_stocks and funds were not marked in the SRS however were a TODO as design proceeded) Note: See the get_state() function
+
+#Safety Requirement #2: Day trading should first be simulated using virtual credits to gauge performance
+
 class AgentActions(Enum):
     Buy = 0
     Sell = 1
